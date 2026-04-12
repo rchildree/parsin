@@ -98,15 +98,21 @@ export interface AdjectiveEntry extends BaseEntry {
 export type PronounType =
   | ""
   | "ego"
+  | "nos"
   | "tu"
+  | "vos"
   | "sui"
   | "qui"
+  | "quis"
+  | "quisquis"
+  | "quidam"
   | "is"
   | "hic"
   | "ille"
   | "iste"
   | "ipse"
   | "idem"
+  | "uterque"
   | "aliquis"
   | "quisque";
 

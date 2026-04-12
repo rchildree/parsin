@@ -38,18 +38,28 @@ function parseTemplate(source: string): ParsedRow[] {
       continue;
     }
 
-    const tokens = line.split(/\s+/);
     const groups: string[][] = [];
+    const regex = /\{([^}]+)\}/g;
+    let match;
+    let currentGroup: string[] = [];
+    let previousMatchEnd = 0;
 
-    for (const token of tokens) {
-      const refs: string[] = [];
-      const regex = /\{([^}]+)\}/g;
-      let match;
-      while ((match = regex.exec(token)) !== null) {
-        const ref = match[1].trim();
-        if (ref) refs.push(ref);
+    while ((match = regex.exec(line)) !== null) {
+      const separator = line.slice(previousMatchEnd, match.index);
+      if (separator.trim()) {
+        currentGroup = [];
+      } else if (separator.includes(" ") || separator.includes("\t")) {
+        if (currentGroup.length > 0) groups.push(currentGroup);
+        currentGroup = [];
       }
-      if (refs.length > 0) groups.push(refs);
+
+      const ref = match[1].trim();
+      if (ref) currentGroup.push(ref);
+      previousMatchEnd = regex.lastIndex;
+    }
+
+    if (currentGroup.length > 0) {
+      groups.push(currentGroup);
     }
 
     if (groups.length > 0) {

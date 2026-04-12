@@ -27,6 +27,50 @@ describe("buildTemplateCharts", () => {
     expect(rendered.rows[0].blocks[1].sections[0].title).toBe("servus");
   });
 
+  it("resolves multi-word references inside a single brace pair", () => {
+    const project: Project = {
+      ...DEFAULT_PROJECT,
+      entries: [
+        ...DEFAULT_PROJECT.entries,
+        {
+          id: "pron-ille",
+          pos: "pronoun",
+          lemma: "ille illa illud",
+          displayName: "ille illa illud",
+          pronounType: "ille"
+        }
+      ]
+    };
+    const template = makeTemplate("{ille illa illud}");
+
+    const rendered = buildTemplateCharts(project, template);
+    expect(rendered.diagnostics).toEqual([]);
+    expect(rendered.rows).toHaveLength(1);
+    expect(rendered.rows[0].blocks).toHaveLength(1);
+    expect(rendered.rows[0].blocks[0].sections[0].title).toBe("ille illa illud");
+  });
+
+  it("resolves newly added multi-word pronoun references", () => {
+    const project: Project = {
+      ...DEFAULT_PROJECT,
+      entries: [
+        ...DEFAULT_PROJECT.entries,
+        {
+          id: "pron-quidam",
+          pos: "pronoun",
+          lemma: "quīdam quaedam quoddam",
+          displayName: "quīdam quaedam quoddam",
+          pronounType: "quidam"
+        }
+      ]
+    };
+    const template = makeTemplate("{quīdam quaedam quoddam}");
+
+    const rendered = buildTemplateCharts(project, template);
+    expect(rendered.diagnostics).toEqual([]);
+    expect(rendered.rows[0].blocks[0].sections[0].title).toBe("quīdam quaedam quoddam");
+  });
+
   it("applies per-entry visibility", () => {
     const project: Project = {
       ...DEFAULT_PROJECT,

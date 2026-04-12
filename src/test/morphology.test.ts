@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CASE_LABELS, NUMBER_LABELS, PERSON_LABELS, TENSE_LABELS } from "../lib/labels";
 import { deriveNounStem, deriveVerbConjugation, deriveVerbStems, displayVerbPresentSystemStem, generateEntrySections, inferDeponentVerb } from "../lib/morphology";
-import type { AdjectiveEntry, NounEntry, VerbEntry, VisibilitySettings } from "../lib/types";
+import type { AdjectiveEntry, NounEntry, PronounEntry, VerbEntry, VisibilitySettings } from "../lib/types";
 
 const visibility: VisibilitySettings = {
   cases: ["nom", "gen", "dat", "acc", "abl", "voc", "loc"],
@@ -159,6 +159,70 @@ describe("adjective generation", () => {
     const aliusSection = generateEntrySections(alius, visibility)[0];
     expect(aliusSection.rows.find((row) => row.key === "positive-nom-sg")?.cells[2].displayText).toBe("aliud");
     expect(aliusSection.rows.find((row) => row.key === "positive-gen-sg")?.cells[0].displayText).toBe("alīus");
+  });
+});
+
+describe("pronoun generation", () => {
+  function makePronounEntry(id: string, displayName: string, pronounType: PronounEntry["pronounType"]): PronounEntry {
+    return {
+      id,
+      pos: "pronoun",
+      lemma: displayName,
+      displayName,
+      pronounType
+    };
+  }
+
+  it("splits ego/nōs and tū/vōs into number-specific paradigms", () => {
+    const egoSection = generateEntrySections(makePronounEntry("ego", "ego", "ego"), visibility)[0];
+    const nosSection = generateEntrySections(makePronounEntry("nos", "nōs", "nos"), visibility)[0];
+    const tuSection = generateEntrySections(makePronounEntry("tu", "tū", "tu"), visibility)[0];
+    const vosSection = generateEntrySections(makePronounEntry("vos", "vōs", "vos"), visibility)[0];
+
+    expect(egoSection.rows.find((row) => row.key === "nom-sg")?.cells[0].displayText).toBe("ego");
+    expect(egoSection.rows.every((row) => row.key.endsWith("-sg"))).toBe(true);
+    expect(nosSection.rows.every((row) => row.key.endsWith("-pl"))).toBe(true);
+    expect(nosSection.rows.find((row) => row.key === "gen-pl")?.cells[0].displayText).toBe("nostrī/nostrum");
+    expect(tuSection.rows.find((row) => row.key === "acc-sg")?.cells[0].displayText).toBe("tē");
+    expect(tuSection.rows.every((row) => row.key.endsWith("-sg"))).toBe(true);
+    expect(vosSection.rows.find((row) => row.key === "dat-pl")?.cells[0].displayText).toBe("vōbīs");
+    expect(vosSection.rows.every((row) => row.key.endsWith("-pl"))).toBe(true);
+  });
+
+  it("supports interrogative quis quid", () => {
+    const section = generateEntrySections(makePronounEntry("quis", "quis quid", "quis"), visibility)[0];
+    const nomSg = section.rows.find((row) => row.key === "nom-sg");
+    const accSg = section.rows.find((row) => row.key === "acc-sg");
+
+    expect(section.title).toBe("quis quid");
+    expect(nomSg?.cells.map((cell) => cell.displayText)).toEqual(["quis", "quis", "quid"]);
+    expect(accSg?.cells[2].displayText).toBe("quid");
+    expect(nomSg?.cells[0].segments[0].role).toBe("form");
+  });
+
+  it("supports quisquis with duplicated forms", () => {
+    const section = generateEntrySections(makePronounEntry("quisquis", "quisquis quidquid", "quisquis"), visibility)[0];
+
+    expect(section.rows.find((row) => row.key === "nom-sg")?.cells.map((cell) => cell.displayText)).toEqual(["quisquis", "quisquis", "quidquid"]);
+    expect(section.rows.find((row) => row.key === "dat-sg")?.cells[0].displayText).toBe("cuicui");
+    expect(section.rows.find((row) => row.key === "acc-pl")?.cells[0].displayText).toBe("quōsquōs");
+  });
+
+  it("supports quīdam with singular and plural forms", () => {
+    const section = generateEntrySections(makePronounEntry("quidam", "quīdam quaedam quoddam", "quidam"), visibility)[0];
+
+    expect(section.rows.find((row) => row.key === "nom-sg")?.cells.map((cell) => cell.displayText)).toEqual(["quīdam", "quaedam", "quoddam"]);
+    expect(section.rows.find((row) => row.key === "gen-pl")?.cells[0].displayText).toBe("quōrundam");
+    expect(section.rows.find((row) => row.key === "acc-pl")?.cells[2].displayText).toBe("quaedam");
+  });
+
+  it("supports uterque with -que forms across both numbers", () => {
+    const section = generateEntrySections(makePronounEntry("uterque", "uterque utraque utrumque", "uterque"), visibility)[0];
+
+    expect(section.rows.find((row) => row.key === "nom-sg")?.cells.map((cell) => cell.displayText)).toEqual(["uterque", "utraque", "utrumque"]);
+    expect(section.rows.find((row) => row.key === "acc-sg")?.cells[1].displayText).toBe("utramque");
+    expect(section.rows.find((row) => row.key === "nom-pl")?.cells[0].displayText).toBe("utrīque");
+    expect(section.rows.find((row) => row.key === "abl-pl")?.cells[2].displayText).toBe("utrīsque");
   });
 });
 

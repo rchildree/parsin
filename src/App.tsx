@@ -14,7 +14,7 @@ import { DEFAULT_PROJECT } from "./lib/sampleData";
 import { exportProject, importProject, loadProject, saveProject } from "./lib/storage";
 import { styleErrors, styleForTarget } from "./lib/styleRules";
 import { buildTemplateCharts } from "./lib/templates";
-import type { ChartSection, GeneratedCell, LatinCase, MorphEntry, NounEntry, Project, SegmentRole, StyleRule, VerbEntry } from "./lib/types";
+import type { ChartSection, GeneratedCell, LatinCase, MorphEntry, NounEntry, Project, PronounType, SegmentRole, StyleRule, VerbEntry } from "./lib/types";
 import { uid } from "./lib/utils";
 
 const STYLE_TARGET_GROUPS: Array<{ label: string; targets: StyleRule["target"][] }> = [
@@ -36,21 +36,48 @@ const STYLE_TARGET_LABELS: Record<string, string> = {
   "verb-supine-stem": "Perfect passive stem"
 };
 
-const PRONOUN_LABELS: Record<string, string> = {
+const PRONOUN_LABELS: Record<PronounType, string> = {
   "": "",
   ego: "ego",
+  nos: "nōs",
   tu: "tū",
+  vos: "vōs",
   sui: "suī",
   qui: "quī quae quod",
+  quis: "quis quid",
+  quisquis: "quisquis quidquid",
+  quidam: "quīdam quaedam quoddam",
   is: "is ea id",
   hic: "hic haec hoc",
   ille: "ille illa illud",
   iste: "iste ista istud",
   ipse: "ipse ipsa ipsum",
   idem: "īdem eadem idem",
+  uterque: "uterque utraque utrumque",
   aliquis: "aliquis aliquid",
   quisque: "quisque quidque"
 };
+
+const PRONOUN_OPTIONS: Exclude<PronounType, "">[] = [
+  "ego",
+  "nos",
+  "tu",
+  "vos",
+  "sui",
+  "qui",
+  "quis",
+  "quisquis",
+  "quidam",
+  "is",
+  "hic",
+  "ille",
+  "iste",
+  "ipse",
+  "idem",
+  "uterque",
+  "aliquis",
+  "quisque"
+];
 
 export default function App() {
   const [project, setProject] = useState<Project>(() => loadProject(DEFAULT_PROJECT));
@@ -659,7 +686,7 @@ function PronounFields({ entry, onChange }: { entry: Extract<MorphEntry, { pos: 
         paradigm
         <select value={entry.pronounType} onChange={(event) => updateParadigm(event.target.value as typeof entry.pronounType)}>
           <option value="">choose...</option>
-          {["ego", "tu", "sui", "qui", "is", "hic", "ille", "iste", "ipse", "idem", "aliquis", "quisque"].map((type) => (
+          {PRONOUN_OPTIONS.map((type) => (
           <option key={type} value={type}>
             {PRONOUN_LABELS[type]}
           </option>
@@ -844,7 +871,7 @@ function TemplatePanel({
         </button>
         {helpOpen && (
           <ul className="template-help-body">
-            <li>Build words on the left for use in charts.</li>
+            <li>Add words on the left for use in charts.</li>
             <li><code>{"{word}"}</code> renders a chart for that word. Match the spelling on the left.</li>
             <li>Words on the same line separated by a space appear <strong>side by side</strong> as separate charts.</li>
             <li>Words on the same line with <strong>no space</strong> between them (<code>{"{word1}{word2}"}</code>) are <strong>merged into one chart</strong> — works best when both words share the same type and visible forms.</li>

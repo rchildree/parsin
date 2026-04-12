@@ -10,6 +10,7 @@ import type {
   NounEntry,
   Person,
   PronounEntry,
+  PronounType,
   TextSegment,
   VerbEntry,
   VerbMood,
@@ -476,7 +477,114 @@ const QUI_TABLE: PronounTable = {
   "abl:pl:n": "quibus"
 };
 
-const PRONOUNS: Record<string, { title: string; genders: boolean; table: PronounTable }> = {
+const QUIS_TABLE: PronounTable = {
+  ...QUI_TABLE,
+  "nom:sg:m": "quis",
+  "nom:sg:f": "quis",
+  "nom:sg:n": "quid",
+  "acc:sg:n": "quid"
+};
+
+const QUISQUIS_TABLE: PronounTable = {
+  "nom:sg:m": "quisquis",
+  "nom:sg:f": "quisquis",
+  "nom:sg:n": "quidquid",
+  "gen:sg:m": "cuiuscuius",
+  "gen:sg:f": "cuiuscuius",
+  "gen:sg:n": "cuiuscuius",
+  "dat:sg:m": "cuicui",
+  "dat:sg:f": "cuicui",
+  "dat:sg:n": "cuicui",
+  "acc:sg:m": "quemquem",
+  "acc:sg:f": "quamquam",
+  "acc:sg:n": "quidquid",
+  "abl:sg:m": "quōquō",
+  "abl:sg:f": "quāquā",
+  "abl:sg:n": "quōquō",
+  "nom:pl:m": "quīquī",
+  "nom:pl:f": "quaequae",
+  "nom:pl:n": "quaequae",
+  "gen:pl:m": "quōrumquōrum",
+  "gen:pl:f": "quārumquārum",
+  "gen:pl:n": "quōrumquōrum",
+  "dat:pl:m": "quibusquibus",
+  "dat:pl:f": "quibusquibus",
+  "dat:pl:n": "quibusquibus",
+  "acc:pl:m": "quōsquōs",
+  "acc:pl:f": "quāsquās",
+  "acc:pl:n": "quaequae",
+  "abl:pl:m": "quibusquibus",
+  "abl:pl:f": "quibusquibus",
+  "abl:pl:n": "quibusquibus"
+};
+
+const QUIDAM_TABLE: PronounTable = {
+  "nom:sg:m": "quīdam",
+  "nom:sg:f": "quaedam",
+  "nom:sg:n": "quoddam",
+  "gen:sg:m": "cuiusdam",
+  "gen:sg:f": "cuiusdam",
+  "gen:sg:n": "cuiusdam",
+  "dat:sg:m": "cuidam",
+  "dat:sg:f": "cuidam",
+  "dat:sg:n": "cuidam",
+  "acc:sg:m": "quendam",
+  "acc:sg:f": "quandam",
+  "acc:sg:n": "quoddam",
+  "abl:sg:m": "quōdam",
+  "abl:sg:f": "quādam",
+  "abl:sg:n": "quōdam",
+  "nom:pl:m": "quīdam",
+  "nom:pl:f": "quaedam",
+  "nom:pl:n": "quaedam",
+  "gen:pl:m": "quōrundam",
+  "gen:pl:f": "quārundam",
+  "gen:pl:n": "quōrundam",
+  "dat:pl:m": "quibusdam",
+  "dat:pl:f": "quibusdam",
+  "dat:pl:n": "quibusdam",
+  "acc:pl:m": "quōsdam",
+  "acc:pl:f": "quāsdam",
+  "acc:pl:n": "quaedam",
+  "abl:pl:m": "quibusdam",
+  "abl:pl:f": "quibusdam",
+  "abl:pl:n": "quibusdam"
+};
+
+const UTERQUE_TABLE: PronounTable = {
+  "nom:sg:m": "uterque",
+  "nom:sg:f": "utraque",
+  "nom:sg:n": "utrumque",
+  "gen:sg:m": "utrīusque",
+  "gen:sg:f": "utrīusque",
+  "gen:sg:n": "utrīusque",
+  "dat:sg:m": "utrīque",
+  "dat:sg:f": "utrīque",
+  "dat:sg:n": "utrīque",
+  "acc:sg:m": "utrumque",
+  "acc:sg:f": "utramque",
+  "acc:sg:n": "utrumque",
+  "abl:sg:m": "utrōque",
+  "abl:sg:f": "utrāque",
+  "abl:sg:n": "utrōque",
+  "nom:pl:m": "utrīque",
+  "nom:pl:f": "utraeque",
+  "nom:pl:n": "utraque",
+  "gen:pl:m": "utrōrumque",
+  "gen:pl:f": "utrārumque",
+  "gen:pl:n": "utrōrumque",
+  "dat:pl:m": "utrīsque",
+  "dat:pl:f": "utrīsque",
+  "dat:pl:n": "utrīsque",
+  "acc:pl:m": "utrōsque",
+  "acc:pl:f": "utrāsque",
+  "acc:pl:n": "utraque",
+  "abl:pl:m": "utrīsque",
+  "abl:pl:f": "utrīsque",
+  "abl:pl:n": "utrīsque"
+};
+
+const PRONOUNS: Record<Exclude<PronounType, "">, { title: string; genders: boolean; table: PronounTable }> = {
   ego: {
     title: "ego",
     genders: false,
@@ -485,7 +593,13 @@ const PRONOUNS: Record<string, { title: string; genders: boolean; table: Pronoun
       "gen:sg": "meī",
       "dat:sg": "mihi",
       "acc:sg": "mē",
-      "abl:sg": "mē",
+      "abl:sg": "mē"
+    }
+  },
+  nos: {
+    title: "nōs",
+    genders: false,
+    table: {
       "nom:pl": "nōs",
       "gen:pl": "nostrī/nostrum",
       "dat:pl": "nōbīs",
@@ -501,7 +615,13 @@ const PRONOUNS: Record<string, { title: string; genders: boolean; table: Pronoun
       "gen:sg": "tuī",
       "dat:sg": "tibi",
       "acc:sg": "tē",
-      "abl:sg": "tē",
+      "abl:sg": "tē"
+    }
+  },
+  vos: {
+    title: "vōs",
+    genders: false,
+    table: {
       "nom:pl": "vōs",
       "gen:pl": "vestrī/vestrum",
       "dat:pl": "vōbīs",
@@ -527,6 +647,21 @@ const PRONOUNS: Record<string, { title: string; genders: boolean; table: Pronoun
     title: "quī quae quod",
     genders: true,
     table: QUI_TABLE
+  },
+  quis: {
+    title: "quis quid",
+    genders: true,
+    table: QUIS_TABLE
+  },
+  quisquis: {
+    title: "quisquis quidquid",
+    genders: true,
+    table: QUISQUIS_TABLE
+  },
+  quidam: {
+    title: "quīdam quaedam quoddam",
+    genders: true,
+    table: QUIDAM_TABLE
   },
   is: { title: "is ea id", genders: true, table: buildPronominalTable("is", "ea", "id", "e", "i") },
   hic: {
@@ -569,6 +704,7 @@ const PRONOUNS: Record<string, { title: string; genders: boolean; table: Pronoun
   iste: { title: "iste ista istud", genders: true, table: buildPronominalTable("iste", "ista", "istud", "ist", "ist") },
   ipse: { title: "ipse ipsa ipsum", genders: true, table: buildPronominalTable("ipse", "ipsa", "ipsum", "ips", "ips") },
   idem: { title: "īdem eadem idem", genders: true, table: buildPronominalTable("īdem", "eadem", "idem", "eōrund", "e") },
+  uterque: { title: "uterque utraque utrumque", genders: true, table: UTERQUE_TABLE },
   aliquis: { title: "aliquis aliquid", genders: true, table: prefixPronoun("ali", "qui") },
   quisque: { title: "quisque quidque", genders: true, table: suffixPronoun("qui", "que") }
 };
@@ -618,6 +754,10 @@ function suffixPronoun(base: keyof typeof PRONOUNS, suffix: string): PronounTabl
   return Object.fromEntries(Object.entries(table).map(([key, value]) => [key, `${value}${suffix}`]));
 }
 
+function pronounHasNumber(table: PronounTable, number: LatinNumber): boolean {
+  return Object.keys(table).some((key) => key.split(":")[1] === number);
+}
+
 function generatePronounSection(entry: PronounEntry, visibility: VisibilitySettings): ChartSection {
   const paradigm = PRONOUNS[entry.pronounType];
   if (!paradigm) {
@@ -639,14 +779,16 @@ function generatePronounSection(entry: PronounEntry, visibility: VisibilitySetti
     entryId: entry.id,
     entryLemma: entry.displayName
   }));
-  const rows = NUMBER_ORDER.flatMap((number) => visibleCases(visibility).map((latinCase) => ({
+  const rows = NUMBER_ORDER
+    .filter((number) => pronounHasNumber(paradigm.table, number))
+    .flatMap((number) => visibleCases(visibility).map((latinCase) => ({
     key: `${latinCase}-${number}`,
     label: `${CASE_LABELS[latinCase]}${NUMBER_LABELS[number]}`,
     cells: columnSlots.map(({ gender }) => {
       const lookupKey = gender ? `${latinCase}:${number}:${gender}` : `${latinCase}:${number}`;
       const key = overrideCellKey([entry.id, "pronoun", latinCase, number, gender]);
       const form = paradigm.table[lookupKey] || "—";
-      return makeCell(entry, key, { case: latinCase, number, ...(gender ? { gender } : {}) }, [{ text: form, role: "ending", label: `${CASE_LABELS[latinCase]} pronoun form` }]);
+      return makeCell(entry, key, { case: latinCase, number, ...(gender ? { gender } : {}) }, [{ text: form, role: "form", label: `${CASE_LABELS[latinCase]} pronoun form` }]);
     })
   })));
 
