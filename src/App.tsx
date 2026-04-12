@@ -196,7 +196,6 @@ export default function App() {
             <h2>Add words for charts</h2>
             {(["noun", "adjective", "pronoun", "verb"] as const).map((pos) => {
               const POS_LABEL: Record<typeof pos, string> = { noun: "Nouns", adjective: "Adjectives", pronoun: "Pronouns", verb: "Verbs" };
-              const POS_BTN: Record<typeof pos, string> = { noun: "Noun", adjective: "Adjective", pronoun: "Pronoun", verb: "Verb" };
               const typeEntries = project.entries
                 .filter((e) => e.pos === pos)
                 .slice()
@@ -205,7 +204,15 @@ export default function App() {
                 <fieldset className="word-group" key={pos}>
                   <legend className="word-group-legend">
                     {POS_LABEL[pos]}
-                    <button type="button" onClick={() => openAddEditor(pos)}>+ {POS_BTN[pos]}</button>
+                    <button
+                      type="button"
+                      className="add-word-button"
+                      aria-label={`Add ${pos}`}
+                      title={`Add ${pos}`}
+                      onClick={() => openAddEditor(pos)}
+                    >
+                      +
+                    </button>
                   </legend>
                   <div className="word-chips">
                     {typeEntries.map((entry) => (
