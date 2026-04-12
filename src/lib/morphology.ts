@@ -759,8 +759,8 @@ function pronounHasNumber(table: PronounTable, number: LatinNumber): boolean {
 }
 
 function generatePronounSection(entry: PronounEntry, visibility: VisibilitySettings): ChartSection {
-  const paradigm = PRONOUNS[entry.pronounType];
-  if (!paradigm) {
+  const { pronounType } = entry;
+  if (!pronounType) {
     return {
       id: `${entry.id}-pronoun`,
       title: entry.displayName || "pronoun",
@@ -770,6 +770,7 @@ function generatePronounSection(entry: PronounEntry, visibility: VisibilitySetti
       rows: []
     };
   }
+  const paradigm = PRONOUNS[pronounType];
   const columnSlots = paradigm.genders
     ? (["m", "f", "n"] as Gender[]).map((gender) => ({ gender }))
     : [{ gender: undefined }];
