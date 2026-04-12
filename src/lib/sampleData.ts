@@ -1,6 +1,6 @@
 import { DEFAULT_CASES } from "./labels";
 import { deriveNounStem, deriveVerbStems } from "./morphology";
-import type { MorphEntry, Project, StyleRule, TemplateDocument, VerbEntry } from "./types";
+import type { MorphEntry, Project, StyleRule, VerbEntry } from "./types";
 
 const makeVerb = (
   id: string,
@@ -101,19 +101,6 @@ const entries: MorphEntry[] = [
   })
 ];
 
-const templates: TemplateDocument[] = [
-  {
-    id: "template-default",
-    name: "Default charts",
-    source: `# Second declension nouns
-{vir} {servus} {dominus} {dōnum}
-
-# Verb sample
-@hide participles
-{amō}`
-  }
-];
-
 const styleRules: StyleRule[] = [
   { id: "style-labels", name: "Labels", target: "labels", cssText: "font-variant: small-caps; font-weight: bold" },
   { id: "style-noun-stems", name: "Noun stems", target: "noun-stems", cssText: "" },
@@ -127,9 +114,11 @@ const styleRules: StyleRule[] = [
 
 export const DEFAULT_PROJECT: Project = {
   entries,
-  templates,
+  template: {
+    id: "template-default",
+    source: "# Second declension nouns\n{vir} {servus} {dominus} {dōnum}\n\n# Verb sample\n{amō}"
+  },
   styleRules,
-  selectedTemplateId: "template-default",
   visibility: {
     cases: DEFAULT_CASES,
     showLocative: false,

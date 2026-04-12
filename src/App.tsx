@@ -28,7 +28,7 @@ const STYLE_TARGET_LABELS: Record<string, string> = {
   "case-endings": "Case endings",
   "noun-stems": "Noun stems",
   "verb-stems": "Verb stems",
-  "verb-tense-markers": "Tense markers",
+  "verb-tense-markers": "Tense/mood markers",
   "verb-thematics": "Thematic vowels",
   "verb-personal-endings": "Personal endings",
   "verb-present-stem": "Present system stem",
@@ -54,15 +54,15 @@ const PRONOUN_LABELS: Record<string, string> = {
 
 export default function App() {
   const [project, setProject] = useState<Project>(() => loadProject(DEFAULT_PROJECT));
-  const [selectedEntryId, setSelectedEntryId] = useState(project.entries[0]?.id || "");
+  const [editorMode, setEditorMode] = useState<"add" | "edit" | null>(null);
+  const [draftEntry, setDraftEntry] = useState<MorphEntry | null>(null);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(true);
   const chartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => saveProject(project), [project]);
 
-  const selectedTemplate = project.templates.find((template) => template.id === project.selectedTemplateId) || project.templates[0];
-  const rendered = useMemo(() => buildTemplateCharts(project, selectedTemplate), [project, selectedTemplate]);
-  const selectedEntry = project.entries.find((entry) => entry.id === selectedEntryId) || project.entries[0];
+  const rendered = useMemo(() => buildTemplateCharts(project, project.template), [project]);
   const cssErrors = styleErrors(project.styleRules);
   const diagnostics = [...rendered.diagnostics, ...cssErrors.map((message) => ({ line: 0, message }))];
   const hasDiagnostics = diagnostics.length > 0;
@@ -82,15 +82,33 @@ export default function App() {
     }));
   }
 
-  function addEntry(pos: MorphEntry["pos"]) {
-    const entry = createEntry(pos);
-    updateProject((current) => ({ ...current, entries: [...current.entries, entry] }));
-    setSelectedEntryId(entry.id);
-  }
-
   function removeEntry(id: string) {
     updateProject((current) => ({ ...current, entries: current.entries.filter((entry) => entry.id !== id) }));
-    setSelectedEntryId(project.entries.find((entry) => entry.id !== id)?.id || "");
+    if (editingEntryId === id) cancelEditor();
+  }
+
+  function openAddEditor(pos: MorphEntry["pos"]) {
+    setDraftEntry(createEntry(pos));
+    setEditorMode("add");
+    setEditingEntryId(null);
+  }
+
+  function openEditEditor(id: string) {
+    setEditingEntryId(id);
+    setEditorMode("edit");
+    setDraftEntry(null);
+  }
+
+  function commitDraft() {
+    if (draftEntry) updateProject((current) => ({ ...current, entries: [...current.entries, draftEntry] }));
+    setDraftEntry(null);
+    setEditorMode(null);
+  }
+
+  function cancelEditor() {
+    setDraftEntry(null);
+    setEditorMode(null);
+    setEditingEntryId(null);
   }
 
   async function copyCharts() {
@@ -126,7 +144,7 @@ export default function App() {
     try {
       const next = importProject(await file.text(), DEFAULT_PROJECT);
       setProject(next);
-      setSelectedEntryId(next.entries[0]?.id || "");
+      cancelEditor();
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Could not import project JSON.");
     }
@@ -147,38 +165,66 @@ export default function App() {
 
       <section className="workspace">
         <section className="top-workspace">
-          <section className="panel entry-panel" aria-label="Saved entries">
-          <div className="add-entry-area">
-            <h2>Chart words</h2>
-            <div className="entry-buttons">
-              <button onClick={() => addEntry("noun")}>+ Noun</button>
-              <button onClick={() => addEntry("adjective")}>+ Adjective</button>
-              <button onClick={() => addEntry("pronoun")}>+ Pronoun</button>
-              <button onClick={() => addEntry("verb")}>+ Verb</button>
-            </div>
-          </div>
-          <div className="entry-list">
-            {project.entries.map((entry) => (
-              <div className={entry.id === selectedEntry?.id ? "entry-item is-selected" : "entry-item"} key={entry.id}>
-                <button className="entry-select" onClick={() => setSelectedEntryId(entry.id)}>
-                  <span>{entry.displayName || `(untitled ${entry.pos})`}</span>
-                  <small>{entry.pos}</small>
-                </button>
-                <button
-                  type="button"
-                  className="icon-button danger"
-                  aria-label={`Delete ${entry.displayName || entry.pos}`}
-                  title="Delete"
-                  onClick={() => removeEntry(entry.id)}
-                >
-                  🗑
-                </button>
+          <section className="panel entry-panel" aria-label="Add words for charts">
+            <h2>Add words for charts</h2>
+            {(["noun", "adjective", "pronoun", "verb"] as const).map((pos) => {
+              const POS_LABEL: Record<typeof pos, string> = { noun: "Nouns", adjective: "Adjectives", pronoun: "Pronouns", verb: "Verbs" };
+              const POS_BTN: Record<typeof pos, string> = { noun: "Noun", adjective: "Adjective", pronoun: "Pronoun", verb: "Verb" };
+              const typeEntries = project.entries
+                .filter((e) => e.pos === pos)
+                .slice()
+                .sort((a, b) => (a.displayName || a.lemma).localeCompare(b.displayName || b.lemma));
+              return (
+                <fieldset className="word-group" key={pos}>
+                  <legend className="word-group-legend">
+                    {POS_LABEL[pos]}
+                    <button type="button" onClick={() => openAddEditor(pos)}>+ {POS_BTN[pos]}</button>
+                  </legend>
+                  <div className="word-chips">
+                    {typeEntries.map((entry) => (
+                      <span
+                        key={entry.id}
+                        className={`word-chip${editingEntryId === entry.id ? " is-active" : ""}`}
+                        onClick={() => openEditEditor(entry.id)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => e.key === "Enter" && openEditEditor(entry.id)}
+                      >
+                        {entry.displayName || `(untitled)`}
+                        <button
+                          type="button"
+                          title={`Delete ${entry.displayName || entry.pos}`}
+                          onClick={(e) => { e.stopPropagation(); removeEntry(entry.id); }}
+                        >×</button>
+                      </span>
+                    ))}
+                  </div>
+                </fieldset>
+              );
+            })}
+            {editorMode && (
+              <div className="entry-editor-dock">
+                {editorMode === "add" && draftEntry ? (
+                  <>
+                    <EntryEditor entry={draftEntry} defaultVisibility={project.visibility} onChange={setDraftEntry} />
+                    <div className="editor-actions">
+                      <button type="button" onClick={commitDraft}>Add {draftEntry.pos}</button>
+                      <button type="button" onClick={cancelEditor}>Cancel</button>
+                    </div>
+                  </>
+                ) : editorMode === "edit" && editingEntryId ? (() => {
+                  const entry = project.entries.find((e) => e.id === editingEntryId);
+                  return entry ? (
+                    <>
+                      <EntryEditor entry={entry} defaultVisibility={project.visibility} onChange={updateEntry} />
+                      <div className="editor-actions">
+                        <button type="button" onClick={cancelEditor}>Done</button>
+                      </div>
+                    </>
+                  ) : null;
+                })() : null}
               </div>
-            ))}
-          </div>
-          {selectedEntry ? (
-            <EntryEditor entry={selectedEntry} defaultVisibility={project.visibility} onChange={updateEntry} />
-          ) : null}
+            )}
           </section>
           <section className="right-stack">
             <TemplatePanel project={project} setProject={setProject} />
@@ -188,15 +234,21 @@ export default function App() {
 
         <section className="charts-area">
           <section className="chart-preview" ref={chartRef} aria-label="Generated charts">
-            {rendered.blocks.length === 0 ? (
-              <div className="empty-state">Add saved-entry references like {"{vir}"} to render a chart.</div>
+            {rendered.rows.length === 0 ? (
+              <div className="empty-state">Type {"{word}"} references in the Chart builder to render charts.</div>
             ) : (
-              rendered.blocks.map((block) => (
-                <div className="chart-block" key={block.id}>
-                  <h2>{block.heading}</h2>
-                  {block.sections.map((section) => (
-                    <ChartTable key={section.id} section={section} styleRules={project.styleRules} />
-                  ))}
+              rendered.rows.map((row) => (
+                <div className="chart-row-group" key={row.id}>
+                  {row.heading ? <h2 className="chart-section-heading">{row.heading}</h2> : null}
+                  <div className="chart-row">
+                    {row.blocks.map((block) => (
+                      <div className="chart-block" key={block.id}>
+                        {block.sections.map((section) => (
+                          <ChartTable key={section.id} section={section} styleRules={project.styleRules} />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))
             )}
@@ -290,11 +342,11 @@ function withAutoName<T extends MorphEntry>(entry: T, _oldSource: string, nextSo
 
 function declensionLabel(declension: NounEntry["declension"]): string {
   const labels: Record<NounEntry["declension"], string> = {
-    "1": "1st declension",
-    "2": "2nd declension",
-    "3": "3rd declension",
-    "4": "4th declension",
-    "5": "5th declension"
+    "1": "A decl.",
+    "2": "O decl.",
+    "3": "C/I decl.",
+    "4": "U decl.",
+    "5": "E decl."
   };
   return labels[declension];
 }
@@ -331,13 +383,13 @@ function conjugationLabel(entry: Extract<MorphEntry, { pos: "verb" }>): string {
 
   const first = entry.principalParts.first.trim();
   const second = entry.principalParts.infinitive.trim();
-  if ((first.endsWith("ō") || first.endsWith("o")) && (second.endsWith("āre") || second.endsWith("are"))) return "Ā conjugation";
-  if (first.endsWith("eō") && second.endsWith("ēre")) return "Ē conjugation";
-  if ((first.endsWith("iō") || first.endsWith("io")) && second.endsWith("ere")) return "E/I conjugation";
-  if ((first.endsWith("ō") || first.endsWith("o")) && second.endsWith("ere")) return "Ĕ conjugation";
-  if ((first.endsWith("iō") || first.endsWith("io")) && (second.endsWith("īre") || second.endsWith("ire"))) return "Ī conjugation";
+  if ((first.endsWith("ō") || first.endsWith("o")) && (second.endsWith("āre") || second.endsWith("are"))) return "Ā conj.";
+  if (first.endsWith("eō") && second.endsWith("ēre")) return "Ē conj.";
+  if ((first.endsWith("iō") || first.endsWith("io")) && second.endsWith("ere")) return "E/I conj.";
+  if ((first.endsWith("ō") || first.endsWith("o")) && second.endsWith("ere")) return "Ĕ conj.";
+  if ((first.endsWith("iō") || first.endsWith("io")) && (second.endsWith("īre") || second.endsWith("ire"))) return "Ī conj.";
 
-  return `${entry.conjugation} conjugation`;
+  return `${entry.conjugation} conj.`;
 }
 
 function adoptDerivedValue(currentValue: string, previousDerivedValue: string, nextDerivedValue: string): string {
@@ -474,7 +526,7 @@ function NounFields({ entry, onChange }: { entry: Extract<MorphEntry, { pos: "no
           <input value={entry.nominative} onChange={(event) => updateNominative(event.target.value)} />
         </label>
         <label>
-          gen.sg. {entry.genitive ? `(${declensionLabel(entry.declension)})` : ""}
+          gen.sg.
           <input value={entry.genitive} onChange={(event) => updateGenitive(event.target.value)} />
         </label>
         <label>
@@ -487,9 +539,8 @@ function NounFields({ entry, onChange }: { entry: Extract<MorphEntry, { pos: "no
         </label>
       </div>
       <div className="noun-stem-line">
-        <span className="derived-chip">{nounStemStatus(entry)}</span>
         <label>
-          stem
+          stem ({nounStemStatus(entry)})
           <input value={entry.stem} onChange={(event) => onChange({ ...entry, stem: event.target.value })} />
         </label>
         <label className={`checkbox-row${entry.declension !== "3" ? " is-disabled" : ""}`}>
@@ -569,9 +620,8 @@ function AdjectiveFields({ entry, onChange }: { entry: Extract<MorphEntry, { pos
         ) : null}
       </div>
       <div className="derive-line adjective-derive-line">
-        <span className="derived-chip">{adjectiveStemStatus(entry)}</span>
         <label>
-          positive stem
+          positive stem ({adjectiveStemStatus(entry)})
           <input value={entry.stem} onChange={(event) => onChange({ ...entry, stem: event.target.value })} />
         </label>
       </div>
@@ -646,15 +696,12 @@ function VerbFields({ entry, onChange }: { entry: Extract<MorphEntry, { pos: "ve
         ))}
       </div>
       <div className="derive-line verb-derive-line">
-        <span className="derived-chip">
-          {verbStemStatus(entry)}
-        </span>
         <label>
-          pres. sys. stem
+          pres. sys. stem ({verbStemStatus(entry)})
           <input className="readonly-field" value={pedagogicalVerbStem(entry)} readOnly />
         </label>
         <label>
-          pf. act. sys.
+          pf. act. sys. stem
           <input value={entry.perfectStem} onChange={(event) => onChange({ ...entry, perfectStem: event.target.value })} />
         </label>
         <label>
@@ -773,82 +820,39 @@ function CollapsiblePanel({
   );
 }
 
-function TemplatePanel({ project, setProject }: { project: Project; setProject: (project: Project) => void }) {
-  const template = project.templates.find((candidate) => candidate.id === project.selectedTemplateId) || project.templates[0];
-
-  function updateTemplate(source: string) {
-    setProject({
-      ...project,
-      templates: project.templates.map((candidate) => (candidate.id === template.id ? { ...candidate, source } : candidate))
-    });
-  }
-
-  function renameTemplate(name: string) {
-    setProject({
-      ...project,
-      templates: project.templates.map((c) => (c.id === template.id ? { ...c, name } : c))
-    });
-  }
-
-  function deleteTemplate() {
-    const next = project.templates.filter((c) => c.id !== template.id);
-    setProject({ ...project, templates: next, selectedTemplateId: next[0].id });
-  }
+function TemplatePanel({
+  project,
+  setProject
+}: {
+  project: Project;
+  setProject: (project: Project) => void;
+}) {
+  const [helpOpen, setHelpOpen] = useState(false);
 
   return (
-    <CollapsiblePanel
-      title="Template"
-      className="template-panel"
-      actions={
-        <button
-          onClick={() => {
-            const next = { id: uid("template"), name: "New template", source: "# New chart\n{vir}" };
-            setProject({ ...project, templates: [...project.templates, next], selectedTemplateId: next.id });
-          }}
-        >
-          New
+    <CollapsiblePanel title="Chart builder" className="template-panel">
+      <textarea
+        className="template-source"
+        value={project.template.source}
+        rows={8}
+        spellCheck={false}
+        onChange={(e) => setProject({ ...project, template: { ...project.template, source: e.target.value } })}
+      />
+      <div className="template-help">
+        <button type="button" className="template-help-toggle" onClick={() => setHelpOpen((v) => !v)}>
+          {helpOpen ? "▾" : "▸"} How to build a chart template
         </button>
-      }
-    >
-      <div className="template-select-row">
-        <select value={template.id} onChange={(event) => setProject({ ...project, selectedTemplateId: event.target.value })}>
-          {project.templates.map((candidate) => (
-            <option key={candidate.id} value={candidate.id}>
-              {candidate.name}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          className="danger"
-          onClick={deleteTemplate}
-          disabled={project.templates.length <= 1}
-          title="Delete template"
-        >
-          Delete
-        </button>
+        {helpOpen && (
+          <ul className="template-help-body">
+            <li>Build words on the left for use in charts.</li>
+            <li><code>{"{word}"}</code> renders a chart for that word. Match the spelling on the left.</li>
+            <li>Words on the same line separated by a space appear <strong>side by side</strong> as separate charts.</li>
+            <li>Words on the same line with <strong>no space</strong> between them (<code>{"{word1}{word2}"}</code>) are <strong>merged into one chart</strong> — works best when both words share the same type and visible forms.</li>
+            <li>Start a line with <code>#</code> to add a heading above the next row of charts: <code># Second declension</code></li>
+            <li>Blank lines are ignored.</li>
+          </ul>
+        )}
       </div>
-      <label>
-        Template name
-        <input value={template.name} onChange={(event) => renameTemplate(event.target.value)} />
-      </label>
-      <textarea className="template-source" value={template.source} onChange={(event) => updateTemplate(event.target.value)} spellCheck={false} />
-      <details className="directive-ref">
-        <summary>Directive reference</summary>
-        <ul className="directive-list">
-          <li><code>@show / @hide infinitive</code></li>
-          <li><code>@show / @hide participle</code></li>
-          <li><code>@show / @hide imperative</code></li>
-          <li><code>@show / @hide indic active</code></li>
-          <li><code>@show / @hide indic passive</code></li>
-          <li><code>@show / @hide subj active</code></li>
-          <li><code>@show / @hide subj passive</code></li>
-          <li><code>@show / @hide locative</code></li>
-          <li><code>@show / @hide all cases</code></li>
-          <li><code>@show / @hide nom / gen / dat / acc / abl / voc / loc</code></li>
-        </ul>
-        <p className="hint">Use <code># Heading</code> for sections and <code>&#123;lemma&#125;</code> to reference saved words.</p>
-      </details>
     </CollapsiblePanel>
   );
 }
@@ -969,9 +973,7 @@ function ChartTable({ section, styleRules }: { section: ChartSection; styleRules
       <thead>
         {section.columns.some((column) => column.groupLabel) ? (
           <tr>
-            <th className="grammar-label corner" style={labelStyle} colSpan={labelColumnCount}>
-              {section.kind === "finite-verb" ? "tense" : ""}
-            </th>
+            <th className="grammar-label corner" style={labelStyle} colSpan={labelColumnCount} />
             {columnGroups.map((group) => (
               <th className="grammar-label group-label" style={labelStyle} key={group.key} colSpan={group.colSpan}>
                 {group.label}

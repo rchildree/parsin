@@ -1,39 +1,33 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_PROJECT } from "../lib/sampleData";
-import { buildTemplateCharts, parseTemplate } from "../lib/templates";
-import type { Project } from "../lib/types";
+import { buildTemplateCharts } from "../lib/templates";
+import type { Project, TemplateDocument } from "../lib/types";
 
-describe("template parsing", () => {
-  it("parses headings, directives, and saved-entry references", () => {
-    const template = {
-      id: "t",
-      name: "Test",
-      source: "# Nouns\n@show locative\n{vir} {servus}"
-    };
+const makeTemplate = (source: string): TemplateDocument => ({ id: "t", source });
 
-    const parsed = parseTemplate(template, DEFAULT_PROJECT.visibility);
-    expect(parsed.diagnostics).toEqual([]);
-    expect(parsed.blocks[0].heading).toBe("Nouns");
-    expect(parsed.blocks[0].references).toEqual(["vir", "servus"]);
-    expect(parsed.blocks[0].visibilityOverrides.showLocative).toBe(true);
-    expect(parsed.blocks[0].caseOverrides?.loc).toBe(true);
-  });
-
-  it("groups compatible entries into one chart with word columns", () => {
-    const template = {
-      id: "t",
-      name: "Test",
-      source: "# Second declension nouns\n{vir} {servus} {dominus} {dōnum}"
-    };
+describe("buildTemplateCharts", () => {
+  it("groups adjacent {word}{word} tokens into one merged chart", () => {
+    const template = makeTemplate("{vir}{servus}{dominus}{dōnum}");
 
     const rendered = buildTemplateCharts(DEFAULT_PROJECT, template);
     expect(rendered.diagnostics).toEqual([]);
-    expect(rendered.blocks[0].sections).toHaveLength(1);
-    expect(rendered.blocks[0].sections[0].columns.map((column) => column.groupLabel)).toContain("vir");
-    expect(rendered.blocks[0].sections[0].rows.find((row) => row.key === "nom-pl")?.label).toBe("nom.pl.");
+    const block = rendered.rows[0].blocks[0];
+    expect(block.sections).toHaveLength(1);
+    expect(block.sections[0].columns.map((c) => c.groupLabel)).toContain("vir");
+    expect(block.sections[0].rows.find((r) => r.key === "nom-pl")?.label).toBe("nom.pl.");
   });
 
-  it("applies per-entry visibility and lets template directives override it", () => {
+  it("keeps space-separated words as separate side-by-side blocks on the same row", () => {
+    const template = makeTemplate("{vir} {servus}");
+
+    const rendered = buildTemplateCharts(DEFAULT_PROJECT, template);
+    expect(rendered.rows).toHaveLength(1);
+    expect(rendered.rows[0].blocks).toHaveLength(2);
+    expect(rendered.rows[0].blocks[0].sections[0].title).toBe("vir");
+    expect(rendered.rows[0].blocks[1].sections[0].title).toBe("servus");
+  });
+
+  it("applies per-entry visibility", () => {
     const project: Project = {
       ...DEFAULT_PROJECT,
       entries: DEFAULT_PROJECT.entries.map((entry) =>
@@ -41,21 +35,15 @@ describe("template parsing", () => {
       )
     };
 
-    const hidden = buildTemplateCharts(project, { id: "t", name: "Test", source: "{servus}" });
-    expect(hidden.blocks[0].sections[0].rows.map((row) => row.label)).toEqual(["nom.sg.", "nom.pl."]);
-
-    const overridden = buildTemplateCharts(project, { id: "t", name: "Test", source: "@show genitive\n{servus}" });
-    expect(overridden.blocks[0].sections[0].rows.map((row) => row.label)).toEqual(["nom.sg.", "gen.sg.", "nom.pl.", "gen.pl."]);
+    const template = makeTemplate("{servus}");
+    const rendered = buildTemplateCharts(project, template);
+    expect(rendered.rows[0].blocks[0].sections[0].rows.map((r) => r.label)).toEqual(["nom.sg.", "nom.pl."]);
   });
 
-  it("reports missing entries", () => {
-    const template = {
-      id: "t",
-      name: "Test",
-      source: "{not-a-word}"
-    };
-
+  it("adds a diagnostic for references not found in the project", () => {
+    const template = makeTemplate("{notaword}");
     const rendered = buildTemplateCharts(DEFAULT_PROJECT, template);
-    expect(rendered.diagnostics[0].message).toContain("Missing entry");
+    expect(rendered.diagnostics.length).toBeGreaterThan(0);
+    expect(rendered.rows).toHaveLength(0);
   });
 });

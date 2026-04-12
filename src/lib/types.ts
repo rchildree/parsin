@@ -153,32 +153,17 @@ export interface StyleRule {
 
 export interface TemplateDocument {
   id: string;
-  name: string;
   source: string;
 }
 
 export interface Project {
   entries: MorphEntry[];
-  templates: TemplateDocument[];
+  template: TemplateDocument;
   styleRules: StyleRule[];
   visibility: VisibilitySettings;
-  selectedTemplateId: string;
 }
 
 export interface Diagnostic {
   line: number;
   message: string;
-}
-
-export interface TemplateBlock {
-  id: string;
-  heading: string;
-  references: string[];
-  visibilityOverrides: Partial<VisibilitySettings>;
-  caseOverrides?: Partial<Record<LatinCase, boolean>>;
-}
-
-export interface RenderedTemplate {
-  diagnostics: Diagnostic[];
-  blocks: TemplateBlock[];
 }

@@ -25,25 +25,31 @@ export function exportProject(project: Project): string {
 
 export function importProject(json: string, fallback: Project): Project {
   const parsed = JSON.parse(json) as Project;
-  if (!Array.isArray(parsed.entries) || !Array.isArray(parsed.templates) || !Array.isArray(parsed.styleRules)) {
-    throw new Error("Project JSON must include entries, templates, and styleRules arrays.");
+  if (!Array.isArray(parsed.entries) || !Array.isArray(parsed.styleRules)) {
+    throw new Error("Project JSON must include entries and styleRules arrays.");
   }
   return normalizeProject(parsed, fallback);
 }
 
-function normalizeProject(project: Project, fallback: Project): Project {
+function normalizeProject(project: Project & { templates?: unknown[]; selectedTemplateId?: unknown }, fallback: Project): Project {
   const visibility = {
     ...fallback.visibility,
     ...project.visibility,
     cases: project.visibility?.cases || fallback.visibility.cases
   };
 
+  // Resolve singular template — if old format had templates[], discard (template data not migrated)
+  let template = project.template;
+  if (!template || typeof (template as { source?: unknown }).source !== "string") {
+    template = fallback.template;
+  }
+
   // Merge in any style rule targets missing from stored data (e.g. after adding new targets)
   const existingTargets = new Set(project.styleRules.map((r) => r.target));
   const missingRules = fallback.styleRules.filter((r) => !existingTargets.has(r.target));
 
   return {
-    ...project,
+    template: { ...template, source: template.source ?? "" },
     styleRules: [...project.styleRules, ...missingRules],
     entries: project.entries.map((rawEntry) => {
       const { overrides: _legacyOverrides, ...entry } = rawEntry as typeof rawEntry & { overrides?: Record<string, string> };

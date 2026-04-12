@@ -47,10 +47,10 @@ export function deriveNounStem(declension: NounEntry["declension"], genitive: st
 export function deriveNounDeclension(genitive: string): NounEntry["declension"] {
   const value = genitive.trim();
   if (value.endsWith("ae")) return "1";
+  if (value.endsWith("ēī") || value.endsWith("eī") || value.endsWith("ei")) return "5";
   if (value.endsWith("ī") || value.endsWith("i")) return "2";
   if (value.endsWith("is")) return "3";
   if (value.endsWith("ūs") || value.endsWith("us")) return "4";
-  if (value.endsWith("ēī") || value.endsWith("eī") || value.endsWith("ei")) return "5";
   return "3";
 }
 
@@ -1268,7 +1268,7 @@ function generateFiniteVerbSection(entry: VerbEntry, visibility: VisibilitySetti
     id: `${entry.id}-finite`,
     title: `${entry.displayName} finite`,
     kind: "finite-verb",
-    signature: `verb:finite:${entry.id}:${columns.map((column) => column.key).join(",")}`,
+    signature: `verb:finite:${columns.map((column) => column.key).join(",")}`,
     columns,
     rows
   };
@@ -1279,7 +1279,7 @@ function generateVerbFormsList(entry: VerbEntry, label: string, forms: Array<[st
     id: `${entry.id}-${label}`,
     title: `${entry.displayName} ${label}`,
     kind: "forms-list",
-    signature: `verb-list:${entry.id}:${label}`,
+    signature: `verb-list:${label}`,
     columns: [{ key: label, label, entryId: entry.id, entryLemma: entry.displayName }],
     rows: forms.map(([rowLabel, segments]) => {
       const key = overrideCellKey([entry.id, label, rowLabel]);
