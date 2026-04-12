@@ -122,7 +122,7 @@ const styleRules: StyleRule[] = [
   { id: "style-verb-perfect-stem", name: "Perfect active stem", target: "verb-perfect-stem", cssText: "" },
   { id: "style-verb-supine-stem", name: "Perfect passive stem", target: "verb-supine-stem", cssText: "" },
   { id: "style-verb-tense-markers", name: "Tense markers", target: "verb-tense-markers", cssText: "" },
-  { id: "style-verb-personal", name: "Personal endings", target: "verb-personal-endings", cssText: "color: #0f6b55; font-weight: bold" }
+  { id: "style-verb-personal", name: "Personal endings", target: "verb-personal-endings", cssText: "color: #3179ff; font-weight: bold" }
 ];
 
 export const DEFAULT_PROJECT: Project = {

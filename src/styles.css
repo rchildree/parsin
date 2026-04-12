@@ -179,7 +179,7 @@ small {
 
 .collapse-toggle:hover {
   border-color: transparent;
-  color: #0f6b55;
+  color: #3179ff;
 }
 
 .collapsible-body {
@@ -226,8 +226,8 @@ small {
 }
 
 .entry-item.is-selected .entry-select {
-  border-color: #0f6b55;
-  box-shadow: inset 0 0 2.5px #0f6b55;
+  border-color: #3179ff;
+  box-shadow: inset 0 0 2.5px #3179ff;
 }
 
 .icon-button {
@@ -295,7 +295,7 @@ small {
 }
 
 .derived-chip {
-  align-self: center;
+  align-self: end;
   background: #eef2f6;
   border: 1px solid #d0d5dd;
   border-radius: 6px;
@@ -357,7 +357,7 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: #0f6b55;
+  border-color: #3179ff;
   outline: 2px solid rgb(15 107 85 / 0.2);
   outline-offset: 0;
 }
@@ -454,7 +454,7 @@ textarea {
 }
 
 .directive-ref summary:hover {
-  color: #0f6b55;
+  color: #3179ff;
 }
 
 .directive-list {
@@ -525,8 +525,8 @@ textarea {
 }
 
 .style-toggle.is-active {
-  background: #0f6b55;
-  border-color: #0f6b55;
+  background: #3179ff;
+  border-color: #3179ff;
   color: #ffffff;
 }
 
@@ -717,7 +717,7 @@ textarea {
 }
 
 .segment-stem.segment-tone-secondary {
-  color: #0f6b55;
+  color: #3179ff;
   font-weight: 600;
 }
 
