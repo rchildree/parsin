@@ -21,7 +21,6 @@ const makeVerb = (
     conjugation,
     principalParts: { first, infinitive, perfect, supine },
     ...stems,
-    overrides: {},
     ...extra
   };
 };
@@ -36,8 +35,7 @@ const entries: MorphEntry[] = [
     gender: "m",
     nominative: "vir",
     genitive: "virī",
-    stem: deriveNounStem("2", "virī"),
-    overrides: {}
+    stem: deriveNounStem("2", "virī")
   },
   {
     id: "noun-servus",
@@ -48,8 +46,7 @@ const entries: MorphEntry[] = [
     gender: "m",
     nominative: "servus",
     genitive: "servī",
-    stem: deriveNounStem("2", "servī"),
-    overrides: {}
+    stem: deriveNounStem("2", "servī")
   },
   {
     id: "noun-dominus",
@@ -60,8 +57,7 @@ const entries: MorphEntry[] = [
     gender: "m",
     nominative: "dominus",
     genitive: "dominī",
-    stem: deriveNounStem("2", "dominī"),
-    overrides: {}
+    stem: deriveNounStem("2", "dominī")
   },
   {
     id: "noun-donum",
@@ -72,8 +68,7 @@ const entries: MorphEntry[] = [
     gender: "n",
     nominative: "dōnum",
     genitive: "dōnī",
-    stem: deriveNounStem("2", "dōnī"),
-    overrides: {}
+    stem: deriveNounStem("2", "dōnī")
   },
   {
     id: "adj-bonus",
@@ -88,16 +83,14 @@ const entries: MorphEntry[] = [
     stem: "bon",
     comparativeStem: "melior",
     superlativeStem: "optim",
-    degrees: ["positive", "comparative", "superlative"],
-    overrides: {}
+    degrees: ["positive", "comparative", "superlative"]
   },
   {
     id: "pron-qui",
     pos: "pronoun",
     lemma: "quī quae quod",
     displayName: "quī",
-    pronounType: "qui",
-    overrides: {}
+    pronounType: "qui"
   },
   makeVerb("verb-amo", "amō", "1", "amō", "amāre", "amāvī", "amātum"),
   makeVerb("verb-sum", "sum", "irregular", "sum", "esse", "fuī", "futūrum", {
@@ -122,24 +115,14 @@ const templates: TemplateDocument[] = [
 ];
 
 const styleRules: StyleRule[] = [
-  {
-    id: "style-labels",
-    name: "Small-caps labels",
-    target: "labels",
-    cssText: "font-weight: 700"
-  },
-  {
-    id: "style-case-endings",
-    name: "Case endings",
-    target: "case-endings",
-    cssText: "color: #b42318; font-weight: 700"
-  },
-  {
-    id: "style-verb-personal",
-    name: "Verb personal endings",
-    target: "verb-personal-endings",
-    cssText: "color: #0f6b55; font-weight: 700"
-  }
+  { id: "style-labels", name: "Labels", target: "labels", cssText: "font-variant: small-caps; font-weight: bold" },
+  { id: "style-noun-stems", name: "Noun stems", target: "noun-stems", cssText: "" },
+  { id: "style-case-endings", name: "Case endings", target: "case-endings", cssText: "color: #b42318; font-weight: bold" },
+  { id: "style-verb-present-stem", name: "Present system stem", target: "verb-present-stem", cssText: "" },
+  { id: "style-verb-perfect-stem", name: "Perfect active stem", target: "verb-perfect-stem", cssText: "" },
+  { id: "style-verb-supine-stem", name: "Perfect passive stem", target: "verb-supine-stem", cssText: "" },
+  { id: "style-verb-tense-markers", name: "Tense markers", target: "verb-tense-markers", cssText: "" },
+  { id: "style-verb-personal", name: "Personal endings", target: "verb-personal-endings", cssText: "color: #0f6b55; font-weight: bold" }
 ];
 
 export const DEFAULT_PROJECT: Project = {

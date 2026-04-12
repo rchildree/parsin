@@ -6,7 +6,7 @@ export type Person = "1" | "2" | "3";
 export type VerbTense = "pres" | "impf" | "fut" | "pf" | "plupf" | "futpf";
 export type VerbMood = "indicative" | "subjunctive";
 export type VerbVoice = "active" | "passive";
-export type SegmentRole = "stem" | "ending" | "tenseMood" | "thematic" | "personal" | "label" | "form";
+export type SegmentRole = "stem" | "ending" | "tenseMood" | "thematic" | "personal" | "auxiliary" | "label" | "form";
 
 export interface TextSegment {
   text: string;
@@ -23,7 +23,6 @@ export interface GeneratedCell {
   segments: TextSegment[];
   generatedText: string;
   displayText: string;
-  override?: string;
 }
 
 export interface ChartColumn {
@@ -68,7 +67,6 @@ export interface BaseEntry {
   lemma: string;
   displayName: string;
   pos: PartOfSpeech;
-  overrides: Record<string, string>;
   visibility?: Partial<VisibilitySettings>;
 }
 
@@ -84,7 +82,7 @@ export interface NounEntry extends BaseEntry {
 
 export interface AdjectiveEntry extends BaseEntry {
   pos: "adjective";
-  adjectiveClass: "1-2" | "3";
+  adjectiveClass: "" | "1-2" | "3";
   pronominal?: boolean;
   nominative?: string;
   feminineForm?: string;
@@ -138,7 +136,17 @@ export type MorphEntry = NounEntry | AdjectiveEntry | PronounEntry | VerbEntry;
 export interface StyleRule {
   id: string;
   name: string;
-  target: "labels" | "case-endings" | "verb-stems" | "verb-tense-markers" | "verb-thematics" | "verb-personal-endings";
+  target:
+    | "labels"
+    | "case-endings"
+    | "noun-stems"
+    | "verb-stems"
+    | "verb-tense-markers"
+    | "verb-thematics"
+    | "verb-personal-endings"
+    | "verb-present-stem"
+    | "verb-perfect-stem"
+    | "verb-supine-stem";
   cssText: string;
   enabled?: boolean;
 }

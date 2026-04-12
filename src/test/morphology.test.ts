@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CASE_LABELS, NUMBER_LABELS, PERSON_LABELS, TENSE_LABELS } from "../lib/labels";
-import { deriveNounStem, deriveVerbStems, generateEntrySections } from "../lib/morphology";
+import { deriveNounStem, deriveVerbConjugation, deriveVerbStems, displayVerbPresentSystemStem, generateEntrySections, inferDeponentVerb } from "../lib/morphology";
 import type { AdjectiveEntry, NounEntry, VerbEntry, VisibilitySettings } from "../lib/types";
 
 const visibility: VisibilitySettings = {
@@ -50,8 +50,7 @@ describe("noun generation", () => {
       gender: "m",
       nominative: "servus",
       genitive: "servī",
-      stem: deriveNounStem("2", "servī"),
-      overrides: {}
+      stem: deriveNounStem("2", "servī")
     };
 
     const section = generateEntrySections(entry, visibility)[0];
@@ -82,8 +81,7 @@ describe("adjective generation", () => {
       stem: "bon",
       comparativeStem: "",
       superlativeStem: "",
-      degrees: ["positive"],
-      overrides: {}
+      degrees: ["positive"]
     };
 
     const section = generateEntrySections(entry, visibility)[0];
@@ -111,8 +109,7 @@ describe("adjective generation", () => {
       stem: "fort",
       comparativeStem: "",
       superlativeStem: "",
-      degrees: ["positive"],
-      overrides: {}
+      degrees: ["positive"]
     };
 
     const section = generateEntrySections(entry, visibility)[0];
@@ -136,8 +133,7 @@ describe("adjective generation", () => {
       stem: "sōl",
       comparativeStem: "",
       superlativeStem: "",
-      degrees: ["positive"],
-      overrides: {}
+      degrees: ["positive"]
     };
 
     const solusSection = generateEntrySections(solus, visibility)[0];
@@ -159,8 +155,7 @@ describe("adjective generation", () => {
       stem: "ali",
       comparativeStem: "",
       superlativeStem: "",
-      degrees: ["positive"],
-      overrides: {}
+      degrees: ["positive"]
     };
 
     const aliusSection = generateEntrySections(alius, visibility)[0];
@@ -170,6 +165,97 @@ describe("adjective generation", () => {
 });
 
 describe("verb generation", () => {
+  it("displays pedagogical present-system stems without changing engine stems", () => {
+    expect(displayVerbPresentSystemStem({ conjugation: "1", presentStem: "am" })).toBe("amā");
+    expect(displayVerbPresentSystemStem({ conjugation: "2", presentStem: "hab" })).toBe("habē");
+    expect(displayVerbPresentSystemStem({ conjugation: "3", presentStem: "ag" })).toBe("ag(e/o)");
+    expect(displayVerbPresentSystemStem({ conjugation: "3io", presentStem: "cap" })).toBe("capi");
+    expect(displayVerbPresentSystemStem({ conjugation: "4", presentStem: "aud" })).toBe("audī");
+    expect(displayVerbPresentSystemStem({ conjugation: "irregular", presentStem: "s" })).toBe("s");
+  });
+
+  it("infers deponent conjugations and present-system displays", () => {
+    const first = { first: "hortor", infinitive: "hortārī", perfect: "hortātus sum", supine: "hortātus" };
+    const second = { first: "vereor", infinitive: "verērī", perfect: "veritus sum", supine: "veritus" };
+    const third = { first: "loquor", infinitive: "loquī", perfect: "locūtus sum", supine: "locūtus" };
+    const thirdIo = { first: "patior", infinitive: "patī", perfect: "passus sum", supine: "passus" };
+    const fourth = { first: "audior", infinitive: "audīrī", perfect: "audītus sum", supine: "audītus" };
+
+    expect(deriveVerbConjugation(first.infinitive, first.first)).toBe("1");
+    expect(deriveVerbConjugation(second.infinitive, second.first)).toBe("2");
+    expect(deriveVerbConjugation(third.infinitive, third.first)).toBe("3");
+    expect(deriveVerbConjugation(thirdIo.infinitive, thirdIo.first)).toBe("3io");
+    expect(deriveVerbConjugation(fourth.infinitive, fourth.first)).toBe("4");
+
+    expect(inferDeponentVerb(first)).toBe(true);
+    expect(inferDeponentVerb(second)).toBe(true);
+    expect(inferDeponentVerb(third)).toBe(true);
+    expect(inferDeponentVerb(thirdIo)).toBe(true);
+    expect(inferDeponentVerb(fourth)).toBe(true);
+    expect(inferDeponentVerb({ first: "amō", infinitive: "amāre", perfect: "amāvī", supine: "amātum" })).toBe(false);
+
+    expect(displayVerbPresentSystemStem({ conjugation: "1", ...deriveVerbStems("1", first) })).toBe("hortā");
+    expect(displayVerbPresentSystemStem({ conjugation: "2", ...deriveVerbStems("2", second) })).toBe("verē");
+    expect(displayVerbPresentSystemStem({ conjugation: "3", ...deriveVerbStems("3", third) })).toBe("loqu(e/o)");
+    expect(displayVerbPresentSystemStem({ conjugation: "3io", ...deriveVerbStems("3io", thirdIo) })).toBe("pati");
+    expect(displayVerbPresentSystemStem({ conjugation: "4", ...deriveVerbStems("4", fourth) })).toBe("audī");
+  });
+
+  it("builds deponent imperfect subjunctive passive from the corrected infinitive base", () => {
+    const firstDep: VerbEntry = {
+      id: "hortor",
+      pos: "verb",
+      lemma: "hortor",
+      displayName: "hortor",
+      conjugation: "1",
+      principalParts: { first: "hortor", infinitive: "hortārī", perfect: "hortātus sum", supine: "hortātus" },
+      ...deriveVerbStems("1", { first: "hortor", infinitive: "hortārī", perfect: "hortātus sum", supine: "hortātus" }),
+      deponent: true
+    };
+    const thirdDep: VerbEntry = {
+      id: "loquor",
+      pos: "verb",
+      lemma: "loquor",
+      displayName: "loquor",
+      conjugation: "3",
+      principalParts: { first: "loquor", infinitive: "loquī", perfect: "locūtus sum", supine: "locūtus" },
+      ...deriveVerbStems("3", { first: "loquor", infinitive: "loquī", perfect: "locūtus sum", supine: "locūtus" }),
+      deponent: true
+    };
+
+    const firstFinite = generateEntrySections(firstDep, visibility).find((section) => section.signature.startsWith("verb:finite"));
+    const thirdFinite = generateEntrySections(thirdDep, visibility).find((section) => section.signature.startsWith("verb:finite"));
+
+    expect(firstFinite?.rows.find((row) => row.key === "impf-sg-1")?.cells[3].displayText).toBe("hortārer");
+    expect(firstFinite?.rows.find((row) => row.key === "impf-pl-2")?.cells[3].displayText).toBe("hortārēminī");
+    expect(firstFinite?.rows.find((row) => row.key === "impf-sg-3")?.cells[3].displayText).toBe("hortārētur");
+    expect(thirdFinite?.rows.find((row) => row.key === "impf-sg-1")?.cells[3].displayText).toBe("loquerer");
+    expect(thirdFinite?.rows.find((row) => row.key === "impf-pl-1")?.cells[3].displayText).toBe("loquerēmur");
+  });
+
+  it("builds deponent infinitives and imperatives with passive morphology", () => {
+    const entry: VerbEntry = {
+      id: "hortor",
+      pos: "verb",
+      lemma: "hortor",
+      displayName: "hortor",
+      conjugation: "1",
+      principalParts: { first: "hortor", infinitive: "hortārī", perfect: "hortātus sum", supine: "hortātus" },
+      ...deriveVerbStems("1", { first: "hortor", infinitive: "hortārī", perfect: "hortātus sum", supine: "hortātus" }),
+      deponent: true
+    };
+
+    const sections = generateEntrySections(entry, visibility);
+    const infinitives = sections.find((section) => section.title.includes("infinitives"));
+    const imperatives = sections.find((section) => section.title.includes("imperatives"));
+
+    expect(infinitives?.rows.find((row) => row.key === "present active")?.cells[0].displayText).toBe("hortārī");
+    expect(infinitives?.rows.find((row) => row.key === "present passive")).toBeUndefined();
+    expect(infinitives?.rows.find((row) => row.key === "perfect active")?.cells[0].displayText).toBe("hortātus esse");
+    expect(imperatives?.rows.find((row) => row.key === "sg.")?.cells[0].displayText).toBe("hortāre");
+    expect(imperatives?.rows.find((row) => row.key === "pl.")?.cells[0].displayText).toBe("hortāminī");
+  });
+
   it("generates regular finite forms with segment metadata", () => {
     const principalParts = { first: "amō", infinitive: "amāre", perfect: "amāvī", supine: "amātum" };
     const stems = deriveVerbStems("1", principalParts);
@@ -180,8 +266,7 @@ describe("verb generation", () => {
       displayName: "amō",
       conjugation: "1",
       principalParts,
-      ...stems,
-      overrides: {}
+      ...stems
     };
 
     const finite = generateEntrySections(entry, visibility).find((section) => section.signature.startsWith("verb:finite"));
@@ -194,6 +279,9 @@ describe("verb generation", () => {
     expect(finite?.rows.find((row) => row.key === "subjunctive")).toBeUndefined();
     expect(finite?.rows.find((row) => row.key === "pres-sg-1")?.cells[2].segments.find((segment) => segment.role === "tenseMood")?.tone).toBe("secondary");
     expect(finite?.rows.find((row) => row.key === "impf-sg-1")?.cells[0].segments.find((segment) => segment.role === "tenseMood")?.text).toBe("ba");
+    expect(finite?.rows.find((row) => row.key === "impf-sg-2")?.cells[2].displayText).toBe("amārēs");
+    expect(finite?.rows.find((row) => row.key === "impf-pl-2")?.cells[3].displayText).toBe("amārēminī");
+    expect(finite?.rows.find((row) => row.key === "impf-pl-3")?.cells[2].displayText).toBe("amārent");
     expect(finite?.rows.find((row) => row.key === "fut-sg-1")?.cells[0].segments.find((segment) => segment.role === "tenseMood")?.text).toBe("b");
     expect(finite?.rows.find((row) => row.key === "fut-sg-1")?.cells[0].segments.find((segment) => segment.role === "personal")?.text).toBe("ō");
     expect(finite?.rows.find((row) => row.key === "fut-sg-1")?.cells[1].segments.find((segment) => segment.role === "tenseMood")?.text).toBe("bo");
@@ -208,6 +296,29 @@ describe("verb generation", () => {
     expect(finite?.rows.find((row) => row.key === "futpf-sg-1")?.cells[0].segments.find((segment) => segment.role === "personal")?.text).toBe("ō");
   });
 
+  it("accepts either -um or -us for the fourth principal part", () => {
+    expect(deriveVerbStems("1", { first: "amō", infinitive: "amāre", perfect: "amāvī", supine: "amātum" }).supineStem).toBe("amāt");
+    expect(deriveVerbStems("1", { first: "amō", infinitive: "amāre", perfect: "amāvī", supine: "amātus" }).supineStem).toBe("amāt");
+  });
+
+  it("still builds charts from the internal present stem", () => {
+    const entry: VerbEntry = {
+      id: "custom",
+      pos: "verb",
+      lemma: "custom",
+      displayName: "custom",
+      conjugation: "3",
+      principalParts: { first: "agō", infinitive: "agere", perfect: "ēgī", supine: "āctum" },
+      presentStem: "xyz",
+      perfectStem: "ēg",
+      supineStem: "āct"
+    };
+
+    const finite = generateEntrySections(entry, visibility).find((section) => section.signature.startsWith("verb:finite"));
+    expect(displayVerbPresentSystemStem(entry)).toBe("xyz(e/o)");
+    expect(finite?.rows.find((row) => row.key === "pres-sg-1")?.cells[0].displayText).toBe("xyzō");
+  });
+
   it("only marks the exclusive personal-ending list as personal", () => {
     const principalParts = { first: "amō", infinitive: "amāre", perfect: "amāvī", supine: "amātum" };
     const entry: VerbEntry = {
@@ -217,8 +328,7 @@ describe("verb generation", () => {
       displayName: "amō",
       conjugation: "1",
       principalParts,
-      ...deriveVerbStems("1", principalParts),
-      overrides: {}
+      ...deriveVerbStems("1", principalParts)
     };
     const finite = generateEntrySections(entry, visibility).find((section) => section.signature.startsWith("verb:finite"));
     const futureFirst = finite?.rows.find((row) => row.key === "fut-sg-1")?.cells[0];
@@ -239,8 +349,7 @@ describe("verb generation", () => {
       displayName: "amō",
       conjugation: "1",
       principalParts: amoParts,
-      ...deriveVerbStems("1", amoParts),
-      overrides: {}
+      ...deriveVerbStems("1", amoParts)
     };
     const agoParts = { first: "agō", infinitive: "agere", perfect: "ēgī", supine: "āctum" };
     const ago: VerbEntry = {
@@ -250,8 +359,7 @@ describe("verb generation", () => {
       displayName: "agō",
       conjugation: "3",
       principalParts: agoParts,
-      ...deriveVerbStems("3", agoParts),
-      overrides: {}
+      ...deriveVerbStems("3", agoParts)
     };
 
     const amoSections = generateEntrySections(amo, visibility);
@@ -268,6 +376,46 @@ describe("verb generation", () => {
     expect(agoSections.find((section) => section.title.includes("infinitives"))?.rows.find((row) => row.key === "present passive")?.cells[0].displayText).toBe("agī");
   });
 
+  it("does not mark passive compound auxiliaries as tense markers", () => {
+    const principalParts = { first: "amō", infinitive: "amāre", perfect: "amāvī", supine: "amātum" };
+    const entry: VerbEntry = {
+      id: "amo",
+      pos: "verb",
+      lemma: "amō",
+      displayName: "amō",
+      conjugation: "1",
+      principalParts,
+      ...deriveVerbStems("1", principalParts)
+    };
+
+    const finite = generateEntrySections(entry, visibility).find((section) => section.signature.startsWith("verb:finite"));
+    const perfectPassiveIndic = finite?.rows.find((row) => row.key === "pf-sg-1")?.cells[1];
+    const pluperfectPassiveIndic = finite?.rows.find((row) => row.key === "plupf-sg-1")?.cells[1];
+    const futurePerfectPassiveIndic = finite?.rows.find((row) => row.key === "futpf-sg-1")?.cells[1];
+    const perfectPassiveSubj = finite?.rows.find((row) => row.key === "pf-sg-1")?.cells[3];
+    const pluperfectPassiveSubj = finite?.rows.find((row) => row.key === "plupf-sg-1")?.cells[3];
+
+    expect(perfectPassiveIndic?.displayText).toBe("amātus sum");
+    expect(perfectPassiveIndic?.segments.find((segment) => segment.role === "auxiliary")?.text).toBe(" sum");
+    expect(perfectPassiveIndic?.segments.some((segment) => segment.role === "tenseMood")).toBe(false);
+
+    expect(pluperfectPassiveIndic?.displayText).toBe("amātus eram");
+    expect(pluperfectPassiveIndic?.segments.find((segment) => segment.role === "auxiliary")?.text).toBe(" eram");
+    expect(pluperfectPassiveIndic?.segments.some((segment) => segment.role === "tenseMood")).toBe(false);
+
+    expect(futurePerfectPassiveIndic?.displayText).toBe("amātus erō");
+    expect(futurePerfectPassiveIndic?.segments.find((segment) => segment.role === "auxiliary")?.text).toBe(" erō");
+    expect(futurePerfectPassiveIndic?.segments.some((segment) => segment.role === "tenseMood")).toBe(false);
+
+    expect(perfectPassiveSubj?.displayText).toBe("amātus sim");
+    expect(perfectPassiveSubj?.segments.find((segment) => segment.role === "auxiliary")?.text).toBe(" sim");
+    expect(perfectPassiveSubj?.segments.some((segment) => segment.role === "tenseMood")).toBe(false);
+
+    expect(pluperfectPassiveSubj?.displayText).toBe("amātus essem");
+    expect(pluperfectPassiveSubj?.segments.find((segment) => segment.role === "auxiliary")?.text).toBe(" essem");
+    expect(pluperfectPassiveSubj?.segments.some((segment) => segment.role === "tenseMood")).toBe(false);
+  });
+
   it("generates correct imperfect indicatives for 3io and 4th conjugation verbs", () => {
     const capioParts = { first: "capiō", infinitive: "capere", perfect: "cēpī", supine: "captum" };
     const capio: VerbEntry = {
@@ -277,8 +425,7 @@ describe("verb generation", () => {
       displayName: "capiō",
       conjugation: "3io",
       principalParts: capioParts,
-      ...deriveVerbStems("3io", capioParts),
-      overrides: {}
+      ...deriveVerbStems("3io", capioParts)
     };
     const audioParts = { first: "audiō", infinitive: "audīre", perfect: "audīvī", supine: "audītum" };
     const audio: VerbEntry = {
@@ -288,8 +435,7 @@ describe("verb generation", () => {
       displayName: "audiō",
       conjugation: "4",
       principalParts: audioParts,
-      ...deriveVerbStems("4", audioParts),
-      overrides: {}
+      ...deriveVerbStems("4", audioParts)
     };
 
     const capioFinite = generateEntrySections(capio, visibility).find((section) => section.signature.startsWith("verb:finite"));
@@ -310,8 +456,7 @@ describe("verb generation", () => {
       displayName: "amō",
       conjugation: "1",
       principalParts,
-      ...deriveVerbStems("1", principalParts),
-      overrides: {}
+      ...deriveVerbStems("1", principalParts)
     };
 
     const participles = generateEntrySections(entry, visibility).find((section) => section.title.includes("participles"));
@@ -330,8 +475,7 @@ describe("verb generation", () => {
         displayName: "dīcō",
         conjugation: "3",
         principalParts: { first: "dīcō", infinitive: "dīcere", perfect: "dīxī", supine: "dictum" },
-        ...deriveVerbStems("3", { first: "dīcō", infinitive: "dīcere", perfect: "dīxī", supine: "dictum" }),
-        overrides: {}
+        ...deriveVerbStems("3", { first: "dīcō", infinitive: "dīcere", perfect: "dīxī", supine: "dictum" })
       },
       {
         id: "duco",
@@ -340,8 +484,7 @@ describe("verb generation", () => {
         displayName: "dūcō",
         conjugation: "3",
         principalParts: { first: "dūcō", infinitive: "dūcere", perfect: "dūxī", supine: "ductum" },
-        ...deriveVerbStems("3", { first: "dūcō", infinitive: "dūcere", perfect: "dūxī", supine: "ductum" }),
-        overrides: {}
+        ...deriveVerbStems("3", { first: "dūcō", infinitive: "dūcere", perfect: "dūxī", supine: "ductum" })
       },
       {
         id: "facio",
@@ -350,8 +493,7 @@ describe("verb generation", () => {
         displayName: "faciō",
         conjugation: "3io",
         principalParts: { first: "faciō", infinitive: "facere", perfect: "fēcī", supine: "factum" },
-        ...deriveVerbStems("3io", { first: "faciō", infinitive: "facere", perfect: "fēcī", supine: "factum" }),
-        overrides: {}
+        ...deriveVerbStems("3io", { first: "faciō", infinitive: "facere", perfect: "fēcī", supine: "factum" })
       },
       {
         id: "fero",
@@ -363,8 +505,7 @@ describe("verb generation", () => {
         presentStem: "fer",
         perfectStem: "tul",
         supineStem: "lāt",
-        irregularKey: "fero",
-        overrides: {}
+        irregularKey: "fero"
       }
     ];
 
@@ -396,8 +537,7 @@ describe("verb generation", () => {
         displayName: "amō",
         conjugation: "1",
         principalParts: amoParts,
-        ...deriveVerbStems("1", amoParts),
-        overrides: {}
+        ...deriveVerbStems("1", amoParts)
       },
       {
         id: "moneo",
@@ -406,8 +546,7 @@ describe("verb generation", () => {
         displayName: "moneō",
         conjugation: "2",
         principalParts: moneoParts,
-        ...deriveVerbStems("2", moneoParts),
-        overrides: {}
+        ...deriveVerbStems("2", moneoParts)
       },
       {
         id: "audio",
@@ -416,8 +555,7 @@ describe("verb generation", () => {
         displayName: "audiō",
         conjugation: "4",
         principalParts: audioParts,
-        ...deriveVerbStems("4", audioParts),
-        overrides: {}
+        ...deriveVerbStems("4", audioParts)
       }
     ];
 
@@ -442,8 +580,7 @@ describe("verb generation", () => {
       presentStem: "s",
       perfectStem: "fu",
       supineStem: "futūr",
-      irregularKey: "sum",
-      overrides: {}
+      irregularKey: "sum"
     };
     const finite = generateEntrySections(entry, visibility).find((section) => section.signature.startsWith("verb:finite"));
     expect(finite?.rows.find((row) => row.key === "pres-sg-3")?.cells[0].displayText).toBe("est");
@@ -470,8 +607,7 @@ describe("verb generation", () => {
       presentStem: "fer",
       perfectStem: "tul",
       supineStem: "lāt",
-      irregularKey: "fero",
-      overrides: {}
+      irregularKey: "fero"
     };
 
     const finite = generateEntrySections(entry, visibility).find((section) => section.signature.startsWith("verb:finite"));
@@ -498,8 +634,7 @@ describe("verb generation", () => {
       presentStem: "fer",
       perfectStem: "tul",
       supineStem: "lāt",
-      irregularKey: "fero",
-      overrides: {}
+      irregularKey: "fero"
     };
 
     const sections = generateEntrySections(entry, visibility);
@@ -508,6 +643,8 @@ describe("verb generation", () => {
     expect(finite?.rows.find((row) => row.key === "pres-sg-2")?.cells[1].displayText).toBe("ferris");
     expect(finite?.rows.find((row) => row.key === "fut-sg-2")?.cells[1].segments.find((segment) => segment.role === "tenseMood")?.text).toBe("ē");
     expect(finite?.rows.find((row) => row.key === "pf-sg-1")?.cells[1].displayText).toBe("lātus sum");
+    expect(finite?.rows.find((row) => row.key === "pf-sg-1")?.cells[1].segments.find((segment) => segment.role === "auxiliary")?.text).toBe(" sum");
+    expect(finite?.rows.find((row) => row.key === "pf-sg-1")?.cells[1].segments.some((segment) => segment.role === "tenseMood")).toBe(false);
 
     const infinitives = sections.find((section) => section.title.includes("infinitives"));
     expect(infinitives?.rows.find((row) => row.key === "present passive")?.cells[0].displayText).toBe("ferrī");

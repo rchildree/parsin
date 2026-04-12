@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_CASES, CASE_LABELS, CASE_ORDER } from "./lib/labels";
 import {
+  displayVerbPresentSystemStem,
   deriveAdjectiveStem,
+  inferDeponentVerb,
   deriveNounDeclension,
   deriveNounStem,
   deriveVerbConjugation,
@@ -10,19 +12,29 @@ import {
 } from "./lib/morphology";
 import { DEFAULT_PROJECT } from "./lib/sampleData";
 import { exportProject, importProject, loadProject, saveProject } from "./lib/storage";
-import { sanitizeCssText, styleErrors, styleForRole } from "./lib/styleRules";
+import { styleErrors, styleForTarget } from "./lib/styleRules";
 import { buildTemplateCharts } from "./lib/templates";
 import type { ChartSection, GeneratedCell, LatinCase, MorphEntry, NounEntry, Project, SegmentRole, StyleRule, VerbEntry } from "./lib/types";
 import { uid } from "./lib/utils";
 
-const STYLE_TARGETS: StyleRule["target"][] = [
-  "labels",
-  "case-endings",
-  "verb-stems",
-  "verb-tense-markers",
-  "verb-thematics",
-  "verb-personal-endings"
+const STYLE_TARGET_GROUPS: Array<{ label: string; targets: StyleRule["target"][] }> = [
+  { label: "All charts", targets: ["labels"] },
+  { label: "Noun & adjective", targets: ["noun-stems", "case-endings"] },
+  { label: "Verb", targets: ["verb-present-stem", "verb-perfect-stem", "verb-supine-stem", "verb-tense-markers", "verb-personal-endings"] }
 ];
+
+const STYLE_TARGET_LABELS: Record<string, string> = {
+  "labels": "Labels",
+  "case-endings": "Case endings",
+  "noun-stems": "Noun stems",
+  "verb-stems": "Verb stems",
+  "verb-tense-markers": "Tense markers",
+  "verb-thematics": "Thematic vowels",
+  "verb-personal-endings": "Personal endings",
+  "verb-present-stem": "Present system stem",
+  "verb-perfect-stem": "Perfect active stem",
+  "verb-supine-stem": "Perfect passive stem"
+};
 
 const PRONOUN_LABELS: Record<string, string> = {
   "": "",
@@ -81,25 +93,6 @@ export default function App() {
     setSelectedEntryId(project.entries.find((entry) => entry.id !== id)?.id || "");
   }
 
-  function setCellOverride(cell: GeneratedCell) {
-    const nextValue = window.prompt(
-      `Override ${cell.entryLemma} ${Object.values(cell.slot).join(" ")}\nGenerated: ${cell.generatedText}\nLeave blank to remove the override.`,
-      cell.override || cell.displayText
-    );
-    if (nextValue === null) return;
-
-    updateProject((current) => ({
-      ...current,
-      entries: current.entries.map((entry) => {
-        if (entry.id !== cell.entryId) return entry;
-        const overrides = { ...entry.overrides };
-        if (nextValue.trim()) overrides[cell.key] = nextValue.trim();
-        else delete overrides[cell.key];
-        return { ...entry, overrides } as MorphEntry;
-      })
-    }));
-  }
-
   async function copyCharts() {
     const node = chartRef.current;
     if (!node) return;
@@ -131,7 +124,7 @@ export default function App() {
   async function handleImport(file: File | undefined) {
     if (!file) return;
     try {
-      const next = importProject(await file.text());
+      const next = importProject(await file.text(), DEFAULT_PROJECT);
       setProject(next);
       setSelectedEntryId(next.entries[0]?.id || "");
     } catch (error) {
@@ -149,11 +142,6 @@ export default function App() {
         <div className="toolbar-actions">
           <button onClick={copyCharts}>Copy charts</button>
           <button onClick={() => window.print()}>Print</button>
-          <button onClick={downloadProject}>Export JSON</button>
-          <label className="file-button">
-            Import JSON
-            <input type="file" accept="application/json" onChange={(event) => handleImport(event.target.files?.[0])} />
-          </label>
         </div>
       </section>
 
@@ -192,8 +180,10 @@ export default function App() {
             <EntryEditor entry={selectedEntry} defaultVisibility={project.visibility} onChange={updateEntry} />
           ) : null}
           </section>
-          <TemplatePanel project={project} setProject={setProject} />
-          <StylePanel project={project} setProject={setProject} />
+          <section className="right-stack">
+            <TemplatePanel project={project} setProject={setProject} />
+            <StylePanel project={project} setProject={setProject} />
+          </section>
         </section>
 
         <section className="charts-area">
@@ -205,7 +195,7 @@ export default function App() {
                 <div className="chart-block" key={block.id}>
                   <h2>{block.heading}</h2>
                   {block.sections.map((section) => (
-                    <ChartTable key={section.id} section={section} styleRules={project.styleRules} onCellOverride={setCellOverride} />
+                    <ChartTable key={section.id} section={section} styleRules={project.styleRules} />
                   ))}
                 </div>
               ))
@@ -246,8 +236,7 @@ function createEntry(pos: MorphEntry["pos"]): MorphEntry {
       gender: "f",
       nominative: "",
       genitive: "",
-      stem: "",
-      overrides: {}
+      stem: ""
     };
   }
   if (pos === "adjective") {
@@ -256,7 +245,7 @@ function createEntry(pos: MorphEntry["pos"]): MorphEntry {
       pos,
       lemma: "",
       displayName: "",
-      adjectiveClass: "1-2",
+      adjectiveClass: "",
       pronominal: false,
       nominative: "",
       feminineForm: "",
@@ -265,8 +254,7 @@ function createEntry(pos: MorphEntry["pos"]): MorphEntry {
       stem: "",
       comparativeStem: "",
       superlativeStem: "",
-      degrees: ["positive"],
-      overrides: {}
+      degrees: ["positive"]
     };
   }
   if (pos === "pronoun") {
@@ -275,8 +263,7 @@ function createEntry(pos: MorphEntry["pos"]): MorphEntry {
       pos,
       lemma: "",
       displayName: "",
-      pronounType: "",
-      overrides: {}
+      pronounType: ""
     };
   }
   const principalParts = { first: "", infinitive: "", perfect: "", supine: "" };
@@ -289,8 +276,7 @@ function createEntry(pos: MorphEntry["pos"]): MorphEntry {
     principalParts,
     presentStem: "",
     perfectStem: "",
-    supineStem: "",
-    overrides: {}
+    supineStem: ""
   };
 }
 
@@ -323,8 +309,20 @@ function deriveAoStem(masculine: string, feminine: string, neuter: string): stri
   return m;
 }
 
+function deriveAoStemIfPossible(masculine: string, feminine: string, neuter: string): string {
+  const f = feminine.trim();
+  const n = neuter.trim();
+  const m = masculine.trim();
+  if (f.endsWith("a")) return f.slice(0, -1);
+  if (n.endsWith("um")) return n.slice(0, -2);
+  if (m.endsWith("us")) return m.slice(0, -2);
+  return "";
+}
+
 function adjectiveClassLabel(adjectiveClass: Extract<MorphEntry, { pos: "adjective" }>["adjectiveClass"]): string {
-  return adjectiveClass === "1-2" ? "A/O adjective" : "C/I adjective";
+  if (adjectiveClass === "1-2") return "A/O adjective";
+  if (adjectiveClass === "3") return "C/I adjective";
+  return "needs more information";
 }
 
 function conjugationLabel(entry: Extract<MorphEntry, { pos: "verb" }>): string {
@@ -342,6 +340,95 @@ function conjugationLabel(entry: Extract<MorphEntry, { pos: "verb" }>): string {
   return `${entry.conjugation} conjugation`;
 }
 
+function adoptDerivedValue(currentValue: string, previousDerivedValue: string, nextDerivedValue: string): string {
+  return !currentValue || currentValue === previousDerivedValue ? nextDerivedValue : currentValue;
+}
+
+function deriveAdjectiveStemIfPossible(entry: Pick<Extract<MorphEntry, { pos: "adjective" }>, "adjectiveClass" | "genitive" | "nominative" | "feminineForm" | "neuterForm">): string {
+  if (!entry.adjectiveClass) return "";
+  if (entry.adjectiveClass === "3") return entry.genitive?.trim() ? deriveAdjectiveStem(entry.genitive) : "";
+  return deriveAoStemIfPossible(entry.nominative || "", entry.feminineForm || "", entry.neuterForm || "");
+}
+
+function syncAdjectiveStem(
+  previous: Extract<MorphEntry, { pos: "adjective" }>,
+  next: Extract<MorphEntry, { pos: "adjective" }>
+): Extract<MorphEntry, { pos: "adjective" }> {
+  const previousDerived = deriveAdjectiveStemIfPossible(previous);
+  const nextDerived = deriveAdjectiveStemIfPossible(next);
+  return {
+    ...next,
+    stem: adoptDerivedValue(previous.stem, previousDerived, nextDerived)
+  };
+}
+
+function deriveVerbMeta(principalParts: VerbEntry["principalParts"]): Pick<VerbEntry, "conjugation" | "irregularKey"> {
+  const irregularKey = detectIrregularVerb(principalParts.first, principalParts.infinitive);
+  const conjugation = irregularKey ? "irregular" : deriveVerbConjugation(principalParts.infinitive, principalParts.first);
+  return { conjugation, irregularKey };
+}
+
+function deriveVerbStemsIfPossible(
+  conjugation: VerbEntry["conjugation"],
+  principalParts: VerbEntry["principalParts"]
+): Pick<VerbEntry, "presentStem" | "perfectStem" | "supineStem"> {
+  const derived = deriveVerbStems(conjugation, principalParts);
+  return {
+    presentStem: principalParts.infinitive.trim() ? derived.presentStem : "",
+    perfectStem: principalParts.perfect.trim() ? derived.perfectStem : "",
+    supineStem: principalParts.supine.trim() ? derived.supineStem : ""
+  };
+}
+
+function syncVerbStems(previous: Extract<MorphEntry, { pos: "verb" }>, next: Extract<MorphEntry, { pos: "verb" }>): Extract<MorphEntry, { pos: "verb" }> {
+  const previousDerived = deriveVerbStemsIfPossible(previous.conjugation, previous.principalParts);
+  const nextDerived = deriveVerbStemsIfPossible(next.conjugation, next.principalParts);
+  const previousDeponent = inferDeponentVerb(previous.principalParts);
+  const nextDeponent = inferDeponentVerb(next.principalParts);
+  const visibility = { ...next.visibility };
+
+  if (nextDeponent) {
+    if (visibility.showIndicativeActive === undefined || visibility.showIndicativeActive === !previousDeponent) {
+      visibility.showIndicativeActive = false;
+    }
+    if (visibility.showSubjunctiveActive === undefined || visibility.showSubjunctiveActive === !previousDeponent) {
+      visibility.showSubjunctiveActive = false;
+    }
+  } else {
+    if (visibility.showIndicativeActive === false && (previous.visibility?.showIndicativeActive === undefined || previous.visibility?.showIndicativeActive === false)) {
+      delete visibility.showIndicativeActive;
+    }
+    if (visibility.showSubjunctiveActive === false && (previous.visibility?.showSubjunctiveActive === undefined || previous.visibility?.showSubjunctiveActive === false)) {
+      delete visibility.showSubjunctiveActive;
+    }
+  }
+
+  return {
+    ...next,
+    presentStem: adoptDerivedValue(previous.presentStem, previousDerived.presentStem, nextDerived.presentStem),
+    perfectStem: adoptDerivedValue(previous.perfectStem, previousDerived.perfectStem, nextDerived.perfectStem),
+    supineStem: adoptDerivedValue(previous.supineStem, previousDerived.supineStem, nextDerived.supineStem),
+    deponent: nextDeponent,
+    visibility
+  };
+}
+
+function nounStemStatus(entry: Extract<MorphEntry, { pos: "noun" }>): string {
+  return entry.genitive.trim() ? declensionLabel(entry.declension) : "needs more information";
+}
+
+function adjectiveStemStatus(entry: Extract<MorphEntry, { pos: "adjective" }>): string {
+  return deriveAdjectiveStemIfPossible(entry) ? adjectiveClassLabel(entry.adjectiveClass) : "needs more information";
+}
+
+function verbStemStatus(entry: Extract<MorphEntry, { pos: "verb" }>): string {
+  return entry.principalParts.first.trim() || entry.principalParts.infinitive.trim() ? conjugationLabel(entry) : "needs more information";
+}
+
+function pedagogicalVerbStem(entry: Extract<MorphEntry, { pos: "verb" }>): string {
+  return displayVerbPresentSystemStem(entry);
+}
+
 function EntryEditor({
   entry,
   defaultVisibility,
@@ -356,19 +443,13 @@ function EntryEditor({
       <h3>Edit {entry.pos}</h3>
       <div className="derived-name-line">
         <span>Chart label</span>
-        <strong>{entry.displayName || "derived automatically"}</strong>
+        <strong>{entry.displayName || "—"}</strong>
       </div>
       {entry.pos === "noun" ? <NounFields entry={entry} onChange={onChange} /> : null}
       {entry.pos === "adjective" ? <AdjectiveFields entry={entry} onChange={onChange} /> : null}
       {entry.pos === "pronoun" ? <PronounFields entry={entry} onChange={onChange} /> : null}
       {entry.pos === "verb" ? <VerbFields entry={entry} onChange={onChange} /> : null}
       <EntryVisibilityControls entry={entry} defaultVisibility={defaultVisibility} onChange={onChange} />
-      <div className="danger-row">
-        <span>{Object.keys(entry.overrides).length} overrides</span>
-        <button type="button" onClick={() => onChange({ ...entry, overrides: {} } as MorphEntry)}>
-          Clear overrides
-        </button>
-      </div>
     </form>
   );
 }
@@ -379,7 +460,10 @@ function NounFields({ entry, onChange }: { entry: Extract<MorphEntry, { pos: "no
   }
 
   function updateGenitive(genitive: string) {
-    onChange({ ...entry, genitive, declension: deriveNounDeclension(genitive) });
+    const declension = deriveNounDeclension(genitive);
+    const previousDerived = entry.genitive.trim() ? deriveNounStem(entry.declension, entry.genitive) : "";
+    const nextDerived = genitive.trim() ? deriveNounStem(declension, genitive) : "";
+    onChange({ ...entry, genitive, declension, stem: adoptDerivedValue(entry.stem, previousDerived, nextDerived) });
   }
 
   return (
@@ -403,19 +487,21 @@ function NounFields({ entry, onChange }: { entry: Extract<MorphEntry, { pos: "no
         </label>
       </div>
       <div className="noun-stem-line">
-        <button type="button" onClick={() => onChange({ ...entry, stem: deriveNounStem(entry.declension, entry.genitive) })}>
-          Derive stems
-        </button>
+        <span className="derived-chip">{nounStemStatus(entry)}</span>
         <label>
           stem
           <input value={entry.stem} onChange={(event) => onChange({ ...entry, stem: event.target.value })} />
         </label>
-        <label className="checkbox-row">
-          <input type="checkbox" checked={Boolean(entry.iStem)} onChange={(event) => onChange({ ...entry, iStem: event.target.checked })} />
+        <label className={`checkbox-row${entry.declension !== "3" ? " is-disabled" : ""}`}>
+          <input
+            type="checkbox"
+            checked={Boolean(entry.iStem)}
+            disabled={entry.declension !== "3"}
+            onChange={(event) => onChange({ ...entry, iStem: event.target.checked })}
+          />
           i-stem
         </label>
       </div>
-      <p className="hint">Start with the genitive singular; add the nominative singular where the stem or nominative form is not predictable.</p>
     </>
   );
 }
@@ -435,15 +521,11 @@ function AdjectiveFields({ entry, onChange }: { entry: Extract<MorphEntry, { pos
   }
 
   function updateNominative(nominative: string) {
-    onChange({ ...withAutoName(entry, entry.nominative || "", nominative), nominative });
+    onChange(syncAdjectiveStem(entry, { ...withAutoName(entry, entry.nominative || "", nominative), nominative }));
   }
 
   function updateGenitive(genitive: string) {
-    onChange({
-      ...entry,
-      genitive,
-      stem: deriveAdjectiveStem(genitive || "")
-    });
+    onChange(syncAdjectiveStem(entry, { ...entry, genitive }));
   }
 
   return (
@@ -453,13 +535,16 @@ function AdjectiveFields({ entry, onChange }: { entry: Extract<MorphEntry, { pos
         <select
           value={entry.adjectiveClass}
           onChange={(event) =>
-            onChange({
-              ...entry,
-              adjectiveClass: event.target.value as "1-2" | "3",
-              ...(event.target.value === "3" ? { pronominal: false } : {})
-            })
+            onChange(
+              syncAdjectiveStem(entry, {
+                ...entry,
+                adjectiveClass: event.target.value as "" | "1-2" | "3",
+                ...(event.target.value === "3" ? { pronominal: false } : {})
+              })
+            )
           }
         >
+          <option value="">choose...</option>
           <option value="1-2">A/O adjective</option>
           <option value="3">C/I adjective</option>
         </select>
@@ -473,15 +558,15 @@ function AdjectiveFields({ entry, onChange }: { entry: Extract<MorphEntry, { pos
       <div className={entry.adjectiveClass === "1-2" ? "three-field-line" : "four-field-line"}>
         <label>
           M
-          <input value={entry.nominative || ""} onChange={(event) => updateNominative(event.target.value)} />
+          <input disabled={!entry.adjectiveClass} value={entry.nominative || ""} onChange={(event) => updateNominative(event.target.value)} />
         </label>
         <label>
           F
-          <input value={entry.feminineForm || ""} onChange={(event) => onChange({ ...entry, feminineForm: event.target.value })} />
+          <input disabled={!entry.adjectiveClass} value={entry.feminineForm || ""} onChange={(event) => onChange(syncAdjectiveStem(entry, { ...entry, feminineForm: event.target.value }))} />
         </label>
         <label>
           N
-          <input value={entry.neuterForm || ""} onChange={(event) => onChange({ ...entry, neuterForm: event.target.value })} />
+          <input disabled={!entry.adjectiveClass} value={entry.neuterForm || ""} onChange={(event) => onChange(syncAdjectiveStem(entry, { ...entry, neuterForm: event.target.value }))} />
         </label>
         {entry.adjectiveClass === "3" ? (
           <label>
@@ -491,25 +576,11 @@ function AdjectiveFields({ entry, onChange }: { entry: Extract<MorphEntry, { pos
         ) : null}
       </div>
       <div className="derive-line adjective-derive-line">
-        <span className="derived-chip">{adjectiveClassLabel(entry.adjectiveClass)}</span>
+        <span className="derived-chip">{adjectiveStemStatus(entry)}</span>
         <label>
           positive stem
           <input value={entry.stem} onChange={(event) => onChange({ ...entry, stem: event.target.value })} />
         </label>
-        <button
-          type="button"
-          onClick={() =>
-            onChange({
-              ...entry,
-              stem:
-                entry.adjectiveClass === "3"
-                  ? deriveAdjectiveStem(entry.genitive || "")
-                  : deriveAoStem(entry.nominative || "", entry.feminineForm || "", entry.neuterForm || "")
-            })
-          }
-        >
-          Derive stems
-        </button>
       </div>
       <div className="two-field-line">
         <label>
@@ -558,18 +629,13 @@ function PronounFields({ entry, onChange }: { entry: Extract<MorphEntry, { pos: 
 }
 
 function VerbFields({ entry, onChange }: { entry: Extract<MorphEntry, { pos: "verb" }>; onChange: (entry: MorphEntry) => void }) {
+  const inferredDeponent = inferDeponentVerb({ ...entry.principalParts, perfect: "", supine: "" });
+
   function updateParts(part: keyof VerbEntry["principalParts"], value: string) {
     const principalParts = { ...entry.principalParts, [part]: value };
-    const irregularKey = detectIrregularVerb(principalParts.first, principalParts.infinitive);
-    const conjugation = irregularKey ? "irregular" : deriveVerbConjugation(principalParts.infinitive, principalParts.first);
     const namedEntry = part === "first" ? withAutoName(entry, entry.principalParts.first, value) : entry;
-    onChange({ ...namedEntry, principalParts, conjugation, irregularKey });
-  }
-
-  function rederive() {
-    const irregularKey = detectIrregularVerb(entry.principalParts.first, entry.principalParts.infinitive);
-    const conjugation = irregularKey ? "irregular" : deriveVerbConjugation(entry.principalParts.infinitive, entry.principalParts.first);
-    onChange({ ...entry, conjugation, irregularKey, ...deriveVerbStems(conjugation, entry.principalParts) });
+    const nextEntry = { ...namedEntry, principalParts, ...deriveVerbMeta(principalParts) };
+    onChange(syncVerbStems(entry, nextEntry));
   }
 
   return (
@@ -578,20 +644,21 @@ function VerbFields({ entry, onChange }: { entry: Extract<MorphEntry, { pos: "ve
         {(["first", "infinitive", "perfect", "supine"] as const).map((part, index) => (
           <label key={part}>
             {index + 1}
-            <input value={entry.principalParts[part]} onChange={(event) => updateParts(part, event.target.value)} />
+            <input
+              disabled={part === "perfect" && inferredDeponent}
+              value={entry.principalParts[part]}
+              onChange={(event) => updateParts(part, event.target.value)}
+            />
           </label>
         ))}
       </div>
       <div className="derive-line verb-derive-line">
         <span className="derived-chip">
-          {conjugationLabel(entry)}
+          {verbStemStatus(entry)}
         </span>
-        <button type="button" onClick={rederive}>
-          Derive stems
-        </button>
         <label>
-          pres. act. sys.
-          <input value={entry.presentStem} onChange={(event) => onChange({ ...entry, presentStem: event.target.value })} />
+          pres. sys. stem
+          <input className="readonly-field" value={pedagogicalVerbStem(entry)} readOnly />
         </label>
         <label>
           pf. act. sys.
@@ -600,10 +667,6 @@ function VerbFields({ entry, onChange }: { entry: Extract<MorphEntry, { pos: "ve
         <label>
           t-stem
           <input value={entry.supineStem} onChange={(event) => onChange({ ...entry, supineStem: event.target.value })} />
-        </label>
-        <label className="checkbox-row">
-          <input type="checkbox" checked={Boolean(entry.deponent)} onChange={(event) => onChange({ ...entry, deponent: event.target.checked })} />
-          deponent
         </label>
       </div>
     </>
@@ -639,24 +702,32 @@ function EntryVisibilityControls({
     return (
       <fieldset className="visibility-box">
         <legend>Include</legend>
-        <div className="check-grid">
+        <div className="verb-include-grid">
           {[
-            ["showIndicativeActive", "indic. act."],
-            ["showIndicativePassive", "indic. pass."],
-            ["showSubjunctiveActive", "subj. act."],
-            ["showSubjunctivePassive", "subj. pass."],
-            ["showInfinitives", "infinitives"],
-            ["showParticiples", "participles"],
-            ["showImperatives", "imperatives"]
-          ].map(([key, label]) => (
-            <label className="checkbox-row" key={key}>
-              <input
-                type="checkbox"
-                checked={Boolean(visibility[key as keyof typeof visibility])}
-                onChange={(event) => updateVisibility({ [key]: event.target.checked })}
-              />
-              {label}
-            </label>
+            [
+              ["showIndicativeActive", "indic. act."],
+              ["showIndicativePassive", "indic. pass."],
+              ["showSubjunctiveActive", "subj. act."],
+              ["showSubjunctivePassive", "subj. pass."]
+            ],
+            [
+              ["showInfinitives", "infinitives"],
+              ["showParticiples", "participles"],
+              ["showImperatives", "imperatives"]
+            ]
+          ].map((row, rowIndex) => (
+            <div className={`verb-include-row verb-include-row-${rowIndex + 1}`} key={`verb-include-row-${rowIndex + 1}`}>
+              {row.map(([key, label]) => (
+                <label className="checkbox-row" key={key}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(visibility[key as keyof typeof visibility])}
+                    onChange={(event) => updateVisibility({ [key]: event.target.checked })}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
           ))}
         </div>
       </fieldset>
@@ -719,6 +790,18 @@ function TemplatePanel({ project, setProject }: { project: Project; setProject: 
     });
   }
 
+  function renameTemplate(name: string) {
+    setProject({
+      ...project,
+      templates: project.templates.map((c) => (c.id === template.id ? { ...c, name } : c))
+    });
+  }
+
+  function deleteTemplate() {
+    const next = project.templates.filter((c) => c.id !== template.id);
+    setProject({ ...project, templates: next, selectedTemplateId: next[0].id });
+  }
+
   return (
     <CollapsiblePanel
       title="Template"
@@ -734,104 +817,151 @@ function TemplatePanel({ project, setProject }: { project: Project; setProject: 
         </button>
       }
     >
-      <select value={template.id} onChange={(event) => setProject({ ...project, selectedTemplateId: event.target.value })}>
-        {project.templates.map((candidate) => (
-          <option key={candidate.id} value={candidate.id}>
-            {candidate.name}
-          </option>
-        ))}
-      </select>
-      <textarea value={template.source} onChange={(event) => updateTemplate(event.target.value)} spellCheck={false} />
-      <p className="hint">Use headings, saved-entry references like {"{vir}"}, and directives such as @show locative or @hide participles.</p>
+      <div className="template-select-row">
+        <select value={template.id} onChange={(event) => setProject({ ...project, selectedTemplateId: event.target.value })}>
+          {project.templates.map((candidate) => (
+            <option key={candidate.id} value={candidate.id}>
+              {candidate.name}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="danger"
+          onClick={deleteTemplate}
+          disabled={project.templates.length <= 1}
+          title="Delete template"
+        >
+          Delete
+        </button>
+      </div>
+      <label>
+        Template name
+        <input value={template.name} onChange={(event) => renameTemplate(event.target.value)} />
+      </label>
+      <textarea className="template-source" value={template.source} onChange={(event) => updateTemplate(event.target.value)} spellCheck={false} />
+      <details className="directive-ref">
+        <summary>Directive reference</summary>
+        <ul className="directive-list">
+          <li><code>@show / @hide infinitive</code></li>
+          <li><code>@show / @hide participle</code></li>
+          <li><code>@show / @hide imperative</code></li>
+          <li><code>@show / @hide indic active</code></li>
+          <li><code>@show / @hide indic passive</code></li>
+          <li><code>@show / @hide subj active</code></li>
+          <li><code>@show / @hide subj passive</code></li>
+          <li><code>@show / @hide locative</code></li>
+          <li><code>@show / @hide all cases</code></li>
+          <li><code>@show / @hide nom / gen / dat / acc / abl / voc / loc</code></li>
+        </ul>
+        <p className="hint">Use <code># Heading</code> for sections and <code>&#123;lemma&#125;</code> to reference saved words.</p>
+      </details>
     </CollapsiblePanel>
   );
 }
 
 function StylePanel({ project, setProject }: { project: Project; setProject: (project: Project) => void }) {
-  function updateRule(rule: StyleRule) {
-    setProject({ ...project, styleRules: project.styleRules.map((candidate) => (candidate.id === rule.id ? rule : candidate)) });
+  function getRuleForTarget(target: StyleRule["target"]): StyleRule {
+    return (
+      project.styleRules.find((r) => r.target === target) ?? {
+        id: `style-${target}`,
+        name: STYLE_TARGET_LABELS[target] ?? target,
+        target,
+        cssText: "",
+        enabled: true
+      }
+    );
   }
 
-  function deleteRule(id: string) {
-    setProject({ ...project, styleRules: project.styleRules.filter((rule) => rule.id !== id) });
+  function updateRule(rule: StyleRule) {
+    const exists = project.styleRules.some((r) => r.target === rule.target);
+    const nextRules = exists
+      ? project.styleRules.map((r) => (r.target === rule.target ? rule : r))
+      : [...project.styleRules, rule];
+    setProject({ ...project, styleRules: nextRules });
+  }
+
+  function renderStyleRow(target: StyleRule["target"]) {
+    const rule = getRuleForTarget(target);
+    const parsed = parseStyleRule(rule.cssText);
+    function updateCss(patch: Partial<ParsedStyle>) {
+      updateRule({ ...rule, cssText: buildStyleCss({ ...parsed, ...patch }) });
+    }
+    return (
+      <div className="style-row" key={target}>
+        <span className="style-row-label">{STYLE_TARGET_LABELS[target]}</span>
+        <div className="style-controls">
+          <button
+            type="button"
+            className={`style-toggle bold-toggle${parsed.bold ? " is-active" : ""}`}
+            onClick={() => updateCss({ bold: !parsed.bold })}
+            title="Bold"
+          >B</button>
+          <button
+            type="button"
+            className={`style-toggle italic-toggle${parsed.italic ? " is-active" : ""}`}
+            onClick={() => updateCss({ italic: !parsed.italic })}
+            title="Italic"
+          >I</button>
+          <button
+            type="button"
+            className={`style-toggle small-caps-toggle${parsed.smallCaps ? " is-active" : ""}`}
+            onClick={() => updateCss({ smallCaps: !parsed.smallCaps })}
+            title="Small caps"
+          >Sc</button>
+          <div className="style-color-wrap">
+            <label className="color-swatch" title={parsed.color ? `Text: ${parsed.color}` : "Click to set text color"}>
+              <input
+                type="color"
+                value={parsed.color || "#b42318"}
+                onChange={(event) => updateCss({ color: event.target.value })}
+              />
+              <span className={`color-dot${parsed.color ? " has-color" : ""}`} style={parsed.color ? { background: parsed.color } : undefined} />
+            </label>
+            <button
+              type="button"
+              className="color-clear"
+              onClick={() => updateCss({ color: "" })}
+              title="Remove text color"
+              style={{ visibility: parsed.color ? "visible" : "hidden" }}
+            >✕</button>
+            <label className="color-swatch" title={parsed.background ? `Background: ${parsed.background}` : "Click to set background color"}>
+              <input
+                type="color"
+                value={parsed.background || "#ffeb80"}
+                onChange={(event) => updateCss({ background: event.target.value })}
+              />
+              <span className={`color-dot bg-dot${parsed.background ? " has-color" : ""}`} style={parsed.background ? { background: parsed.background } : undefined} />
+            </label>
+            <button
+              type="button"
+              className="color-clear"
+              onClick={() => updateCss({ background: "" })}
+              title="Remove background color"
+              style={{ visibility: parsed.background ? "visible" : "hidden" }}
+            >✕</button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <CollapsiblePanel
-      title="Styles"
-      className="style-panel"
-      actions={
-        <button
-          onClick={() =>
-            setProject({
-              ...project,
-              styleRules: [...project.styleRules, { id: uid("style"), name: "New style", target: "case-endings", cssText: "color: #b42318" }]
-            })
-          }
-        >
-          Add
-        </button>
-      }
-    >
-      {project.styleRules.map((rule) => {
-        const validation = sanitizeCssText(rule.cssText);
-        return (
-          <div className="style-rule" key={rule.id}>
-            <div className="style-rule-header">
-              <label>
-                Name
-                <input value={rule.name} onChange={(event) => updateRule({ ...rule, name: event.target.value })} aria-label="Style name" />
-              </label>
-              <label>
-                Target
-                <select value={rule.target} onChange={(event) => updateRule({ ...rule, target: event.target.value as StyleRule["target"] })}>
-                  {STYLE_TARGETS.map((target) => (
-                    <option key={target} value={target}>
-                      {target}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="checkbox-row style-enabled">
-                <input
-                  type="checkbox"
-                  checked={rule.enabled !== false}
-                  onChange={(event) => updateRule({ ...rule, enabled: event.target.checked })}
-                />
-                enabled
-              </label>
-              <button type="button" className="danger" onClick={() => deleteRule(rule.id)}>
-                Delete
-              </button>
-            </div>
-            <label>
-              CSS declarations
-              <textarea
-                className="style-css"
-                value={rule.cssText}
-                onChange={(event) => updateRule({ ...rule, cssText: event.target.value })}
-                aria-label="CSS declarations"
-              />
-            </label>
-            <div className="style-preview-row">
-              <span className="style-preview" style={cssTextToStyle(validation.cssText)}>
-                Preview
-              </span>
-              {validation.errors.length ? (
-                <small className="error-text">{validation.errors.join(" ")}</small>
-              ) : (
-                <small>{validation.cssText || "No declarations"}</small>
-              )}
-            </div>
+    <CollapsiblePanel title="Styles" className="style-panel">
+      <div className="style-list">
+        {STYLE_TARGET_GROUPS.map((group) => (
+          <div key={group.label}>
+            <div className="style-group-label">{group.label}</div>
+            {group.targets.map((target) => renderStyleRow(target))}
           </div>
-        );
-      })}
+        ))}
+      </div>
     </CollapsiblePanel>
   );
 }
 
-function ChartTable({ section, styleRules, onCellOverride }: { section: ChartSection; styleRules: StyleRule[]; onCellOverride: (cell: GeneratedCell) => void }) {
-  const labelStyle = cssTextToStyle(styleForRole("label", styleRules));
+function ChartTable({ section, styleRules }: { section: ChartSection; styleRules: StyleRule[] }) {
+  const labelStyle = cssTextToStyle(styleForTarget("labels", styleRules));
   const hasSubLabels = section.rows.some((row) => row.subLabel);
   const labelColumnCount = hasSubLabels ? 2 : 1;
   const columnGroups = buildColumnGroups(section.columns);
@@ -895,30 +1025,24 @@ function ChartTable({ section, styleRules, onCellOverride }: { section: ChartSec
               <td
                 key={cell.key}
                 className={[
-                  cell.override ? "has-override" : "",
                   cellBackgroundClass(cell, section),
                   columnDividerClass(section, startIndex)
                 ]
                   .filter(Boolean)
                   .join(" ")}
                 colSpan={colSpan}
-                onClick={() => onCellOverride(cell)}
-                title={cell.override ? `Generated: ${cell.generatedText}` : "Click to override"}
+                style={cellBackgroundStyle(cell, section, styleRules)}
               >
-                {cell.override ? (
-                  cell.displayText
-                ) : (
-                  cell.segments.map((segment, index) => (
-                    <span
-                      key={`${segment.role}-${index}-${segment.text}`}
-                      className={["segment", `segment-${segment.role}`, segment.tone ? `segment-tone-${segment.tone}` : ""].filter(Boolean).join(" ")}
-                      style={cssTextToStyle(styleForSegment(segment.role, section.kind, styleRules))}
-                      title={segment.label}
-                    >
-                      {segment.text}
-                    </span>
-                  ))
-                )}
+                {cell.segments.map((segment, index) => (
+                  <span
+                    key={`${segment.role}-${index}-${segment.text}`}
+                    className={["segment", `segment-${segment.role}`, segment.tone ? `segment-tone-${segment.tone}` : ""].filter(Boolean).join(" ")}
+                    style={cssTextToStyle(styleForSegment(segment.role, segment.tone, section.kind, styleRules))}
+                    title={segment.label}
+                  >
+                    {segment.text}
+                  </span>
+                ))}
               </td>
             ))}
           </tr>
@@ -1003,9 +1127,54 @@ function buildColumnGroups(columns: ChartSection["columns"]): Array<{ key: strin
   return groups;
 }
 
-function styleForSegment(role: SegmentRole, kind: ChartSection["kind"], rules: StyleRule[]): string | undefined {
-  if (role === "ending" && kind === "case-grid") return styleForRole(role, rules);
-  if (["stem", "tenseMood", "thematic", "personal"].includes(role) && kind !== "case-grid") return styleForRole(role, rules);
+function styleForSegment(role: SegmentRole, tone: "secondary" | "tertiary" | undefined, kind: ChartSection["kind"], rules: StyleRule[]): string | undefined {
+  if (role === "ending" && kind === "case-grid") return styleForTarget("case-endings", rules);
+  if (role === "stem" && kind === "case-grid") return styleForTarget("noun-stems", rules);
+  if (role === "stem" && kind !== "case-grid") {
+    if (!tone) return styleForTarget("verb-present-stem", rules);
+    if (tone === "secondary") return styleForTarget("verb-perfect-stem", rules);
+    if (tone === "tertiary") return styleForTarget("verb-supine-stem", rules);
+  }
+  if (role === "tenseMood" && kind !== "case-grid") return styleForTarget("verb-tense-markers", rules);
+  if (role === "personal" && kind !== "case-grid") return styleForTarget("verb-personal-endings", rules);
+  return undefined;
+}
+
+function lightenHex(hex: string, amount = 0.88): string {
+  const clean = hex.replace("#", "");
+  const full = clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `rgb(${Math.round(r + (255 - r) * amount)},${Math.round(g + (255 - g) * amount)},${Math.round(b + (255 - b) * amount)})`;
+}
+
+function getRuleColor(target: StyleRule["target"], rules: StyleRule[]): string {
+  const rule = rules.find((r) => r.target === target && r.enabled !== false);
+  return rule ? parseStyleRule(rule.cssText).color : "";
+}
+
+function cellBackgroundStyle(cell: GeneratedCell, section: ChartSection, rules: StyleRule[]): React.CSSProperties | undefined {
+  if (section.kind === "finite-verb" && cell.generatedText !== "—") {
+    if (cell.slot.voice === "active" && ["pf", "plupf", "futpf"].includes(cell.slot.tense || "")) {
+      const color = getRuleColor("verb-perfect-stem", rules);
+      if (color) return { background: lightenHex(color) };
+    }
+    if (cell.slot.voice === "passive" && ["pf", "plupf", "futpf"].includes(cell.slot.tense || "")) {
+      const color = getRuleColor("verb-supine-stem", rules);
+      if (color) return { background: lightenHex(color) };
+    }
+  }
+  if (section.kind === "forms-list") {
+    if (cell.slot.label === "perfect active") {
+      const color = getRuleColor("verb-perfect-stem", rules);
+      if (color) return { background: lightenHex(color) };
+    }
+    if (["perfect passive", "future active"].includes(cell.slot.label || "")) {
+      const color = getRuleColor("verb-supine-stem", rules);
+      if (color) return { background: lightenHex(color) };
+    }
+  }
   return undefined;
 }
 
@@ -1022,4 +1191,40 @@ function cssTextToStyle(cssText: string | undefined): React.CSSProperties | unde
         return [camelCase, valueParts.join(":").trim()];
       })
   ) as React.CSSProperties;
+}
+
+interface ParsedStyle {
+  bold: boolean;
+  italic: boolean;
+  smallCaps: boolean;
+  color: string;
+  background: string;
+}
+
+function parseStyleRule(cssText: string): ParsedStyle {
+  const decls: Record<string, string> = {};
+  for (const raw of cssText.split(";")) {
+    const decl = raw.trim();
+    if (!decl) continue;
+    const i = decl.indexOf(":");
+    if (i === -1) continue;
+    decls[decl.slice(0, i).trim().toLowerCase()] = decl.slice(i + 1).trim();
+  }
+  return {
+    bold: decls["font-weight"] === "bold" || decls["font-weight"] === "700",
+    italic: decls["font-style"] === "italic",
+    smallCaps: !!decls["font-variant"]?.includes("small-caps"),
+    color: decls["color"] || "",
+    background: decls["background-color"] || decls["background"] || ""
+  };
+}
+
+function buildStyleCss({ bold, italic, smallCaps, color, background }: ParsedStyle): string {
+  const parts: string[] = [];
+  parts.push(bold ? "font-weight: bold" : "font-weight: normal");
+  parts.push(italic ? "font-style: italic" : "font-style: normal");
+  if (smallCaps) parts.push("font-variant: small-caps");
+  if (color) parts.push(`color: ${color}`);
+  if (background) parts.push(`background-color: ${background}`);
+  return parts.join("; ");
 }

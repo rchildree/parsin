@@ -1,0 +1,74 @@
+1. The Athematic & Suppletive "Big Eight"
+
+These are the foundational irregulars. They often combine ancient athematic present systems with suppletive perfect systems.
+Verb	Principal Parts	Key Irregularities
+sum	sum, esse, fui, futurus	Highly suppletive; root es- vs fu-; athematic present.
+possum	possum, posse, potui	Compound of pote + sum; infinitive is posse (not possere).
+volo	volo, velle, volui	Irregular present (vis, vult); unique infinitive and subjunctive (velim).
+nolo	nolo, nolle, nolui	Contraction of ne + volo; imperative noli is vital for prohibitions.
+malo	malo, malle, malui	Contraction of magis + volo.
+fero	fero, ferre, tuli, latus	Massive suppletion (fer-, tul-, lat-); athematic present (fers, fert).
+eo	eo, ire, ii (ivi), itum	Root i- changes to e- before vowels (eo, eunt); irregular future (ibo).
+fio	fio, fieri, factus sum	Serves as the passive of facio; active forms with passive meaning.
+2. The "Eating" Verb (Edo)
+
+While it can be conjugated regularly as a 3rd conjugation verb, edo frequently uses athematic forms that are identical to forms of sum.
+
+    edo, edere (esse), edi, esum (to eat)
+
+        es (you eat) vs. es (you are)
+
+        est (he eats) vs. est (he is)
+
+        esse (to eat) vs. esse (to be)
+
+3. Semi-Deponent Verbs
+
+These verbs are regular in the present system but switch to passive forms (with active meanings) in the perfect system.
+
+    audeo, audere, ausus sum: to dare
+
+    gaudeo, gaudere, gavisus sum: to rejoice
+
+    soleo, solere, solitus sum: to be accustomed to
+
+    fido, fidere, fisus sum: to trust (and its compounds: confido, diffido)
+
+4. Defective Verbs (Non-Impersonal)
+
+These verbs lack a full suite of forms. The "Preteritive" verbs below have perfect forms but present meanings.
+Preteritive Verbs
+
+    memini, meminisse: to remember (Perfect forms translated as present).
+
+    odi, odisse: to hate (Perfect forms translated as present).
+
+    coepi, coepisse: to have begun (Only exists in perfect system).
+
+Others
+
+    aio: I say/assert (Mostly used in ait or aiunt).
+
+    inquam: I say (Used almost exclusively in direct quotes).
+
+    fari: to speak (Mostly poetic; lacks many present indicative forms).
+
+    quaeo / nequeo: I am able / I am unable (Conjugated like eo, but many forms are rare).
+
+    ave / salve: (Imperative only) greetings.
+
+5. Significant Compounds
+
+While these follow the patterns of their roots, their prefix changes often mask their identity.
+
+    prosum, prodesse, profui: (to be useful) Inserts a -d- when the root begins with a vowel (pro-d-est).
+
+    absum / adsum: (sum compounds).
+
+    redeo, abeo, exeo, pereo: (eo compounds). Note that ambio (to go around) is actually a regular 4th conjugation verb.
+
+    affero, confero, differo, effero, infero, offero, refero: (fero compounds) These exhibit various phonetic assimilations (e.g., ad + fero = affero).
+
+6. The Oddity of Do
+
+    do, dare, dedi, datus: Unlike other 1st conjugation verbs, the a is short (ă) in most forms (e.g., dămus, dătis, dăre), except for das and the 2nd person singular imperative da.

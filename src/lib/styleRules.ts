@@ -6,6 +6,7 @@ const ALLOWED_PROPERTIES = new Set([
   "background-color",
   "font-weight",
   "font-style",
+  "font-variant",
   "text-decoration",
   "border",
   "border-bottom",
@@ -15,10 +16,14 @@ const ALLOWED_PROPERTIES = new Set([
 const TARGET_TO_ROLES: Record<StyleRule["target"], SegmentRole[]> = {
   labels: ["label"],
   "case-endings": ["ending"],
+  "noun-stems": ["stem"],
   "verb-stems": ["stem"],
   "verb-tense-markers": ["tenseMood"],
   "verb-thematics": ["thematic"],
-  "verb-personal-endings": ["personal"]
+  "verb-personal-endings": ["personal"],
+  "verb-present-stem": ["stem"],
+  "verb-perfect-stem": ["stem"],
+  "verb-supine-stem": ["stem"]
 };
 
 export function sanitizeCssText(cssText: string): { cssText: string; errors: string[] } {
@@ -61,6 +66,14 @@ export function styleForRole(role: SegmentRole, rules: StyleRule[]): string | un
     .map((rule) => sanitizeCssText(rule.cssText).cssText)
     .filter(Boolean);
 
+  return declarations.length ? declarations.join("; ") : undefined;
+}
+
+export function styleForTarget(target: StyleRule["target"], rules: StyleRule[]): string | undefined {
+  const declarations = rules
+    .filter((r) => r.enabled !== false && r.target === target)
+    .map((r) => sanitizeCssText(r.cssText).cssText)
+    .filter(Boolean);
   return declarations.length ? declarations.join("; ") : undefined;
 }
 

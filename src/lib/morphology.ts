@@ -17,7 +17,7 @@ import type {
   VerbVoice,
   VisibilitySettings
 } from "./types";
-import { overrideCellKey, removeEnding, segmentsForStemEnding, textOf } from "./utils";
+import { overrideCellKey, removeEnding, segmentsForStemEnding, stripMacrons, textOf } from "./utils";
 
 const DEFAULT_VISIBILITY: VisibilitySettings = {
   cases: DEFAULT_CASES,
@@ -59,29 +59,52 @@ export function deriveVerbStems(
   principalParts: VerbEntry["principalParts"]
 ): Pick<VerbEntry, "presentStem" | "perfectStem" | "supineStem"> {
   const infinitiveEndings: Record<VerbEntry["conjugation"], string[]> = {
-    "1": ["āre", "are"],
-    "2": ["ēre", "ere"],
-    "3": ["ere"],
-    "3io": ["ere"],
-    "4": ["īre", "ire"],
+    "1": ["ārī", "ari", "āre", "are"],
+    "2": ["ērī", "eri", "ēre", "ere"],
+    "3": ["ere", "ī", "i"],
+    "3io": ["ere", "ī", "i"],
+    "4": ["īrī", "iri", "īre", "ire"],
     irregular: []
   };
 
   return {
     presentStem: removeEnding(principalParts.infinitive.trim(), infinitiveEndings[conjugation]),
     perfectStem: removeEnding(principalParts.perfect.trim(), ["ī", "i"]),
-    supineStem: removeEnding(principalParts.supine.trim(), ["um"])
+    supineStem: removeEnding(principalParts.supine.trim(), ["um", "us"])
   };
 }
 
+export function displayVerbPresentSystemStem(entry: Pick<VerbEntry, "conjugation" | "presentStem">): string {
+  if (!entry.presentStem) return "";
+  if (entry.conjugation === "1") return `${entry.presentStem}ā`;
+  if (entry.conjugation === "2") return `${entry.presentStem}ē`;
+  if (entry.conjugation === "3") return `${entry.presentStem}(e/o)`;
+  if (entry.conjugation === "3io") return `${entry.presentStem}i`;
+  if (entry.conjugation === "4") return `${entry.presentStem}ī`;
+  return entry.presentStem;
+}
+
 export function deriveVerbConjugation(infinitive: string, firstPrincipalPart = ""): VerbEntry["conjugation"] {
-  const value = infinitive.trim();
-  const first = firstPrincipalPart.trim();
-  if (value.endsWith("āre") || value.endsWith("are")) return "1";
-  if (value.endsWith("ēre")) return "2";
-  if (value.endsWith("īre") || value.endsWith("ire")) return "4";
-  if (value.endsWith("ere")) return first.endsWith("iō") || first.endsWith("io") ? "3io" : "3";
+  const value = stripMacrons(infinitive.trim()).toLowerCase();
+  const first = stripMacrons(firstPrincipalPart.trim()).toLowerCase();
+  if (value.endsWith("ari")) return "1";
+  if (value.endsWith("iri")) return "4";
+  if (value.endsWith("eri") && (first.endsWith("eo") || first.endsWith("eor"))) return "2";
+  if (value.endsWith("are")) return "1";
+  if (value.endsWith("ere")) return (first.endsWith("eo") || first.endsWith("eor")) ? "2" : (first.endsWith("io") || first.endsWith("ior") ? "3io" : "3");
+  if (value.endsWith("ire")) return "4";
+  if (value.endsWith("i")) return first.endsWith("ior") ? "3io" : "3";
   return "irregular";
+}
+
+export function inferDeponentVerb(principalParts: VerbEntry["principalParts"]): boolean {
+  const first = stripMacrons(principalParts.first.trim()).toLowerCase();
+  const second = stripMacrons(principalParts.infinitive.trim()).toLowerCase();
+  if (second.endsWith("ari")) return first.endsWith("or");
+  if (second.endsWith("eri")) return first.endsWith("eor");
+  if (second.endsWith("iri")) return first.endsWith("ior");
+  if (second.endsWith("i")) return first.endsWith("ior") || first.endsWith("or");
+  return false;
 }
 
 export function detectIrregularVerb(firstPrincipalPart: string, infinitive = ""): VerbEntry["irregularKey"] | undefined {
@@ -125,7 +148,6 @@ function makeCell(
   slot: Record<string, string>,
   segments: TextSegment[]
 ): GeneratedCell {
-  const override = entry.overrides[key];
   const generatedText = textOf(segments);
   return {
     key,
@@ -134,8 +156,7 @@ function makeCell(
     slot,
     segments,
     generatedText,
-    displayText: override || generatedText,
-    override
+    displayText: generatedText
   };
 }
 
@@ -1073,7 +1094,7 @@ function regularFiniteSegments(entry: VerbEntry, mood: VerbMood, voice: VerbVoic
     const aux = IRREGULAR_ACTIVE.sum[auxMood]![auxTense as VerbTense]![formIndex(person, number)];
     return [
       { text: participle, role: "stem", label: "perfect passive participle", tone: "tertiary" },
-      { text: ` ${aux}`, role: "tenseMood", label: "auxiliary" }
+      { text: ` ${aux}`, role: "auxiliary", label: "auxiliary" }
     ];
   }
 
@@ -1103,8 +1124,13 @@ function regularFiniteSegments(entry: VerbEntry, mood: VerbMood, voice: VerbVoic
       return presentSubjunctiveSegments(entry, voice, person, number);
     }
     if (tense === "impf") {
+      const infinitiveStem = imperfectSubjunctiveInfinitiveBase(
+        voice === "passive" && entry.deponent ? deponentImperfectSubjunctiveInfinitive(entry) : entry.principalParts.infinitive,
+        person,
+        number
+      );
       return [
-        { text: entry.principalParts.infinitive, role: "stem", label: "present infinitive stem" },
+        { text: infinitiveStem, role: "stem", label: "present infinitive stem" },
         { text: voice === "active" ? activeEnding : passiveEnding, role: "personal", label: "personal ending" }
       ];
     }
@@ -1113,6 +1139,33 @@ function regularFiniteSegments(entry: VerbEntry, mood: VerbMood, voice: VerbVoic
   }
 
   return [{ text: "—", role: "form", label: "not applicable" }];
+}
+
+function deponentImperfectSubjunctiveInfinitive(entry: VerbEntry): string {
+  const infinitive = entry.principalParts.infinitive.trim();
+  if (entry.conjugation === "1") {
+    if (infinitive.endsWith("ārī")) return `${removeEnding(infinitive, ["ārī"])}āre`;
+    if (infinitive.endsWith("ari")) return `${removeEnding(infinitive, ["ari"])}are`;
+  }
+  if (entry.conjugation === "2") {
+    if (infinitive.endsWith("ērī")) return `${removeEnding(infinitive, ["ērī"])}ēre`;
+    if (infinitive.endsWith("eri")) return `${removeEnding(infinitive, ["eri"])}ere`;
+  }
+  if (entry.conjugation === "3" || entry.conjugation === "3io") {
+    if (infinitive.endsWith("ī")) return `${removeEnding(infinitive, ["ī"])}ere`;
+    if (infinitive.endsWith("i")) return `${removeEnding(infinitive, ["i"])}ere`;
+  }
+  if (entry.conjugation === "4") {
+    if (infinitive.endsWith("īrī")) return `${removeEnding(infinitive, ["īrī"])}īre`;
+    if (infinitive.endsWith("iri")) return `${removeEnding(infinitive, ["iri"])}ire`;
+  }
+  return infinitive;
+}
+
+function imperfectSubjunctiveInfinitiveBase(infinitive: string, person: Person, number: LatinNumber): string {
+  if ((person === "1" && number === "sg") || (person === "3" && number === "pl")) return infinitive;
+  if (infinitive.endsWith("e")) return `${infinitive.slice(0, -1)}ē`;
+  return infinitive;
 }
 
 function perfectActiveEnding(person: Person, number: LatinNumber): string {
@@ -1268,6 +1321,13 @@ function imperativeForms(entry: VerbEntry): Array<[string, TextSegment[]]> {
     ];
   }
 
+  if (entry.deponent) {
+    return [
+      ["sg.", [{ text: deponentSingularImperative(entry), role: "form", label: "singular imperative" }]],
+      ["pl.", [{ text: deponentPluralImperative(entry), role: "form", label: "plural imperative" }]]
+    ];
+  }
+
   const singularThematic = entry.conjugation === "1" ? "ā" : entry.conjugation === "2" ? "ē" : entry.conjugation === "4" ? "ī" : "e";
   const pluralSuffix =
     entry.conjugation === "1"
@@ -1288,9 +1348,42 @@ function infinitiveForms(entry: VerbEntry): Array<[string, TextSegment[]]> {
   if (!entry.deponent && (!entry.irregularKey || entry.irregularKey === "fero")) {
     forms.push(["present passive", presentPassiveInfinitive(entry)]);
   }
-  forms.push(["perfect active", verbSegments(entry.perfectStem, "", "", "isse")]);
+  forms.push([
+    "perfect active",
+    entry.deponent
+      ? [{ text: `${entry.supineStem}us esse`, role: "form", label: "perfect active infinitive" }]
+      : verbSegments(entry.perfectStem, "", "", "isse")
+  ]);
   forms.push(["future active", verbSegments(entry.supineStem, "", "", "ūrus esse")]);
   return forms;
+}
+
+function deponentSingularImperative(entry: VerbEntry): string {
+  const infinitive = entry.principalParts.infinitive.trim();
+  if (entry.conjugation === "1") {
+    if (infinitive.endsWith("ārī")) return `${removeEnding(infinitive, ["ārī"])}āre`;
+    if (infinitive.endsWith("ari")) return `${removeEnding(infinitive, ["ari"])}are`;
+  }
+  if (entry.conjugation === "2") {
+    if (infinitive.endsWith("ērī")) return `${removeEnding(infinitive, ["ērī"])}ēre`;
+    if (infinitive.endsWith("eri")) return `${removeEnding(infinitive, ["eri"])}ere`;
+  }
+  if (entry.conjugation === "3" || entry.conjugation === "3io") {
+    if (infinitive.endsWith("ī")) return `${removeEnding(infinitive, ["ī"])}ere`;
+    if (infinitive.endsWith("i")) return `${removeEnding(infinitive, ["i"])}ere`;
+  }
+  if (entry.conjugation === "4") {
+    if (infinitive.endsWith("īrī")) return `${removeEnding(infinitive, ["īrī"])}īre`;
+    if (infinitive.endsWith("iri")) return `${removeEnding(infinitive, ["iri"])}ire`;
+  }
+  return infinitive;
+}
+
+function deponentPluralImperative(entry: VerbEntry): string {
+  if (entry.conjugation === "1") return `${entry.presentStem}āminī`;
+  if (entry.conjugation === "2") return `${entry.presentStem}ēminī`;
+  if (entry.conjugation === "4") return `${entry.presentStem}īminī`;
+  return `${entry.presentStem}iminī`;
 }
 
 function presentPassiveInfinitive(entry: VerbEntry): TextSegment[] {
