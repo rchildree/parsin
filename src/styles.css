@@ -304,6 +304,12 @@ small {
   gap: 0.65rem;
 }
 
+.entry-editor{
+  padding: 2rem 1rem;
+  background: #d1f0ff;
+  border: 1px solid #4191e7;
+}
+
 .two-field-line,
 .three-field-line,
 .four-field-line,

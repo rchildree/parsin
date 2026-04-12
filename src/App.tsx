@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DEFAULT_CASES, CASE_LABELS, CASE_ORDER } from "./lib/labels";
 import {
   displayVerbPresentSystemStem,
@@ -239,22 +239,31 @@ export default function App() {
             {editorMode && (
               <div className="entry-editor-dock">
                 {editorMode === "add" && draftEntry ? (
-                  <>
-                    <EntryEditor entry={draftEntry} defaultVisibility={project.visibility} onChange={setDraftEntry} />
-                    <div className="editor-actions">
-                      <button type="button" onClick={commitDraft}>Add {draftEntry.pos}</button>
-                      <button type="button" onClick={cancelEditor}>Cancel</button>
-                    </div>
-                  </>
+                  <EntryEditor
+                    entry={draftEntry}
+                    defaultVisibility={project.visibility}
+                    onChange={setDraftEntry}
+                    onSubmit={commitDraft}
+                    footer={
+                      <div className="editor-actions">
+                        <button type="submit">Add {draftEntry.pos}</button>
+                        <button type="button" onClick={cancelEditor}>Cancel</button>
+                      </div>
+                    }
+                  />
                 ) : editorMode === "edit" && editingEntryId ? (() => {
                   const entry = project.entries.find((e) => e.id === editingEntryId);
                   return entry ? (
-                    <>
-                      <EntryEditor entry={entry} defaultVisibility={project.visibility} onChange={updateEntry} />
-                      <div className="editor-actions">
-                        <button type="button" onClick={cancelEditor}>Done</button>
-                      </div>
-                    </>
+                    <EntryEditor
+                      entry={entry}
+                      defaultVisibility={project.visibility}
+                      onChange={updateEntry}
+                      footer={
+                        <div className="editor-actions">
+                          <button type="button" onClick={cancelEditor}>Done</button>
+                        </div>
+                      }
+                    />
                   ) : null;
                 })() : null}
               </div>
@@ -518,14 +527,24 @@ function pedagogicalVerbStem(entry: Extract<MorphEntry, { pos: "verb" }>): strin
 function EntryEditor({
   entry,
   defaultVisibility,
-  onChange
+  onChange,
+  onSubmit,
+  footer
 }: {
   entry: MorphEntry;
   defaultVisibility: Project["visibility"];
   onChange: (entry: MorphEntry) => void;
+  onSubmit?: () => void;
+  footer?: ReactNode;
 }) {
   return (
-    <form className="entry-editor" onSubmit={(event) => event.preventDefault()}>
+    <form
+      className="entry-editor"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit?.();
+      }}
+    >
       <h3>Edit {entry.pos}</h3>
       <div className="derived-name-line">
         <span>Chart label</span>
@@ -536,6 +555,7 @@ function EntryEditor({
       {entry.pos === "pronoun" ? <PronounFields entry={entry} onChange={onChange} /> : null}
       {entry.pos === "verb" ? <VerbFields entry={entry} onChange={onChange} /> : null}
       <EntryVisibilityControls entry={entry} defaultVisibility={defaultVisibility} onChange={onChange} />
+      {footer}
     </form>
   );
 }
