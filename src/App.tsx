@@ -538,8 +538,7 @@ function AdjectiveFields({ entry, onChange }: { entry: Extract<MorphEntry, { pos
             onChange(
               syncAdjectiveStem(entry, {
                 ...entry,
-                adjectiveClass: event.target.value as "" | "1-2" | "3",
-                ...(event.target.value === "3" ? { pronominal: false } : {})
+                adjectiveClass: event.target.value as "" | "1-2" | "3"
               })
             )
           }
@@ -549,12 +548,6 @@ function AdjectiveFields({ entry, onChange }: { entry: Extract<MorphEntry, { pos
           <option value="3">C/I adjective</option>
         </select>
       </label>
-      {entry.adjectiveClass === "1-2" ? (
-        <label className="checkbox-row">
-          <input type="checkbox" checked={Boolean(entry.pronominal)} onChange={(event) => onChange({ ...entry, pronominal: event.target.checked })} />
-          pronominal decl.
-        </label>
-      ) : null}
       <div className={entry.adjectiveClass === "1-2" ? "three-field-line" : "four-field-line"}>
         <label>
           M

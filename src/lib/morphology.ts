@@ -270,9 +270,15 @@ function pronominalGenitiveForm(stem: string): { stem: string; ending: string } 
   return { stem, ending: "īus" };
 }
 
+function autoPronominalAdjective(entry: AdjectiveEntry): boolean {
+  if (entry.adjectiveClass !== "1-2") return false;
+  const nominative = stripMacrons((entry.nominative || "").trim()).toLowerCase();
+  return ["unus", "nullus", "ullus", "solus", "neuter", "alius", "uter", "totus", "alter"].includes(nominative);
+}
+
 function defaultAoNeuter(entry: AdjectiveEntry, stem: string): string {
   if (entry.neuterForm) return entry.neuterForm;
-  if (entry.pronominal && (entry.nominative || "").endsWith("ius")) {
+  if ((entry.pronominal || autoPronominalAdjective(entry)) && (entry.nominative || "").endsWith("ius")) {
     return (entry.nominative || "").replace(/ius$/, "iud");
   }
   return `${stem}um`;
@@ -354,7 +360,7 @@ function adjectiveEnding(
           ? entry.feminineForm || `${stem}a`
           : defaultAoNeuter(entry, stem);
 
-  if (entry.adjectiveClass === "1-2" && degree === "positive" && entry.pronominal && number === "sg") {
+  if (entry.adjectiveClass === "1-2" && degree === "positive" && (entry.pronominal || autoPronominalAdjective(entry)) && number === "sg") {
     if (latinCase === "gen") {
       return pronominalGenitiveForm(stem);
     }
