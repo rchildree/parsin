@@ -1565,10 +1565,11 @@ function infinitiveSegments(form: string, stem: string, stemLabel: string, formL
     return [{ text: form, role: "form", label: formLabel }];
   }
 
-  return [
+  const segments: TextSegment[] = [
     { text: stem, role: "stem", label: stemLabel },
     { text: form.slice(stem.length), role: "form", label: formLabel }
-  ].filter((segment) => segment.text.length > 0);
+  ];
+  return segments.filter((segment) => segment.text.length > 0);
 }
 
 function participleForms(entry: VerbEntry): Array<[string, TextSegment[]]> {
