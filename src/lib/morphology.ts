@@ -1119,9 +1119,18 @@ function finiteMarkerIsLong(person: Person, number: LatinNumber): boolean {
   return (person === "2" && number === "sg") || (number === "pl" && person !== "3");
 }
 
+function passiveThirdSingularLong(person: Person, number: LatinNumber): boolean {
+  return person === "3" && number === "sg";
+}
+
+function subjunctiveMarkerIsLong(voice: VerbVoice, person: Person, number: LatinNumber): boolean {
+  return finiteMarkerIsLong(person, number) || (voice === "passive" && passiveThirdSingularLong(person, number));
+}
+
 function presentSubjunctiveSegments(entry: VerbEntry, voice: VerbVoice, person: Person, number: LatinNumber): TextSegment[] {
-  const marker = finiteMarkerIsLong(person, number) ? "ā" : "a";
-  const firstConjugationMarker = finiteMarkerIsLong(person, number) ? "ē" : "e";
+  const longMarker = subjunctiveMarkerIsLong(voice, person, number);
+  const marker = longMarker ? "ā" : "a";
+  const firstConjugationMarker = longMarker ? "ē" : "e";
   const personal = voice === "active" ? activePersonal(person, number) : passivePersonal(person, number);
 
   if (entry.conjugation === "1") {
@@ -1158,7 +1167,7 @@ function futureFirstSecondSegments(entry: VerbEntry, voice: VerbVoice, person: P
 
 function futureOtherSegments(entry: VerbEntry, voice: VerbVoice, person: Person, number: LatinNumber): TextSegment[] {
   const stemVowel = entry.conjugation === "3io" || entry.conjugation === "4" ? "i" : "";
-  const marker = person === "1" && number === "sg" ? "a" : person === "3" && number === "pl" ? "e" : "ē";
+  const marker = person === "1" && number === "sg" ? "a" : person === "3" ? "e" : "ē";
   const personal = voice === "active" ? activePersonal(person, number) : passivePersonal(person, number);
   return verbSegments(entry.presentStem, marker, stemVowel, personal, { tenseMood: "secondary" });
 }
@@ -1184,7 +1193,7 @@ function pluperfectSubjunctiveActiveSegments(entry: VerbEntry, person: Person, n
 function presentVowel(entry: VerbEntry, person: Person, number: LatinNumber): string {
   const c = entry.conjugation;
   if (c === "1") return person === "1" && number === "sg" ? "" : person === "3" && number === "pl" ? "a" : "ā";
-  if (c === "2") return person === "1" && number === "sg" ? "e" : person === "3" && number === "pl" ? "e" : "ē";
+  if (c === "2") return (person === "1" && number === "sg") || person === "3" ? "e" : "ē";
   if (c === "3") return person === "1" && number === "sg" ? "" : person === "3" && number === "pl" ? "u" : "i";
   if (c === "3io") return person === "3" && number === "pl" ? "iu" : person === "1" && number === "sg" ? "i" : "i";
   return person === "3" && number === "pl" ? "iu" : person === "1" && number === "sg" ? "i" : person === "2" && number === "sg" ? "ī" : number === "pl" && person !== "3" ? "ī" : "i";
@@ -1275,6 +1284,7 @@ function regularFiniteSegments(entry: VerbEntry, mood: VerbMood, voice: VerbVoic
     if (tense === "impf") {
       const infinitiveStem = imperfectSubjunctiveInfinitiveBase(
         voice === "passive" && entry.deponent ? deponentImperfectSubjunctiveInfinitive(entry) : entry.principalParts.infinitive,
+        voice,
         person,
         number
       );
@@ -1283,7 +1293,10 @@ function regularFiniteSegments(entry: VerbEntry, mood: VerbMood, voice: VerbVoic
         { text: voice === "active" ? activeEnding : passiveEnding, role: "personal", label: "personal ending" }
       ];
     }
-    if (tense === "pf") return verbSegments(perfectStem, "eri", "", activeEnding, { stem: "secondary", tenseMood: "secondary" });
+    if (tense === "pf") {
+      const marker = finiteMarkerIsLong(person, number) ? "erī" : "eri";
+      return verbSegments(perfectStem, marker, "", activeEnding, { stem: "secondary", tenseMood: "secondary" });
+    }
     if (tense === "plupf") return pluperfectSubjunctiveActiveSegments(entry, person, number);
   }
 
@@ -1311,8 +1324,8 @@ function deponentImperfectSubjunctiveInfinitive(entry: VerbEntry): string {
   return infinitive;
 }
 
-function imperfectSubjunctiveInfinitiveBase(infinitive: string, person: Person, number: LatinNumber): string {
-  if ((person === "1" && number === "sg") || (person === "3" && number === "pl")) return infinitive;
+function imperfectSubjunctiveInfinitiveBase(infinitive: string, voice: VerbVoice, person: Person, number: LatinNumber): string {
+  if (!subjunctiveMarkerIsLong(voice, person, number)) return infinitive;
   if (infinitive.endsWith("e")) return `${infinitive.slice(0, -1)}ē`;
   return infinitive;
 }
@@ -1493,17 +1506,20 @@ function imperativeForms(entry: VerbEntry): Array<[string, TextSegment[]]> {
 }
 
 function infinitiveForms(entry: VerbEntry): Array<[string, TextSegment[]]> {
-  const forms: Array<[string, TextSegment[]]> = [["present active", [{ text: entry.principalParts.infinitive, role: "form", label: "present active infinitive" }]]];
+  const forms: Array<[string, TextSegment[]]> = [[
+    "present active",
+    infinitiveSegments(entry.principalParts.infinitive, entry.presentStem, "present-system stem", "present active infinitive")
+  ]];
   if (!entry.deponent && (!entry.irregularKey || entry.irregularKey === "fero")) {
     forms.push(["present passive", presentPassiveInfinitive(entry)]);
   }
   forms.push([
     "perfect active",
     entry.deponent
-      ? [{ text: `${entry.supineStem}us esse`, role: "form", label: "perfect active infinitive" }]
-      : verbSegments(entry.perfectStem, "", "", "isse")
+      ? infinitiveSegments(`${entry.supineStem}us esse`, entry.supineStem, "supine stem", "perfect active infinitive")
+      : infinitiveSegments(`${entry.perfectStem}isse`, entry.perfectStem, "perfect stem", "perfect active infinitive")
   ]);
-  forms.push(["future active", verbSegments(entry.supineStem, "", "", "ūrus esse")]);
+  forms.push(["future active", infinitiveSegments(`${entry.supineStem}ūrus esse`, entry.supineStem, "supine stem", "future active infinitive")]);
   return forms;
 }
 
@@ -1536,12 +1552,23 @@ function deponentPluralImperative(entry: VerbEntry): string {
 }
 
 function presentPassiveInfinitive(entry: VerbEntry): TextSegment[] {
-  if (entry.irregularKey === "fero") return [{ text: "ferrī", role: "form", label: "present passive infinitive" }];
-  if (entry.conjugation === "1") return [{ text: `${entry.presentStem}ārī`, role: "form", label: "present passive infinitive" }];
-  if (entry.conjugation === "2") return [{ text: `${entry.presentStem}ērī`, role: "form", label: "present passive infinitive" }];
-  if (entry.conjugation === "3" || entry.conjugation === "3io") return [{ text: `${entry.presentStem}ī`, role: "form", label: "present passive infinitive" }];
-  if (entry.conjugation === "4") return [{ text: `${entry.presentStem}īrī`, role: "form", label: "present passive infinitive" }];
+  if (entry.irregularKey === "fero") return infinitiveSegments("ferrī", entry.presentStem, "present-system stem", "present passive infinitive");
+  if (entry.conjugation === "1") return infinitiveSegments(`${entry.presentStem}ārī`, entry.presentStem, "present-system stem", "present passive infinitive");
+  if (entry.conjugation === "2") return infinitiveSegments(`${entry.presentStem}ērī`, entry.presentStem, "present-system stem", "present passive infinitive");
+  if (entry.conjugation === "3" || entry.conjugation === "3io") return infinitiveSegments(`${entry.presentStem}ī`, entry.presentStem, "present-system stem", "present passive infinitive");
+  if (entry.conjugation === "4") return infinitiveSegments(`${entry.presentStem}īrī`, entry.presentStem, "present-system stem", "present passive infinitive");
   return [{ text: "—", role: "form", label: "not applicable" }];
+}
+
+function infinitiveSegments(form: string, stem: string, stemLabel: string, formLabel: string): TextSegment[] {
+  if (!stem || !form.startsWith(stem)) {
+    return [{ text: form, role: "form", label: formLabel }];
+  }
+
+  return [
+    { text: stem, role: "stem", label: stemLabel },
+    { text: form.slice(stem.length), role: "form", label: formLabel }
+  ].filter((segment) => segment.text.length > 0);
 }
 
 function participleForms(entry: VerbEntry): Array<[string, TextSegment[]]> {

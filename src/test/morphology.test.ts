@@ -342,6 +342,8 @@ describe("verb generation", () => {
     expect(finite?.rows.find((row) => row.key === "pres-sg-1")?.cells[2].segments.find((segment) => segment.role === "tenseMood")?.tone).toBe("secondary");
     expect(finite?.rows.find((row) => row.key === "impf-sg-1")?.cells[0].segments.find((segment) => segment.role === "tenseMood")?.text).toBe("ba");
     expect(finite?.rows.find((row) => row.key === "impf-sg-2")?.cells[2].displayText).toBe("amārēs");
+    expect(finite?.rows.find((row) => row.key === "impf-sg-3")?.cells[2].displayText).toBe("amāret");
+    expect(finite?.rows.find((row) => row.key === "impf-sg-3")?.cells[3].displayText).toBe("amārētur");
     expect(finite?.rows.find((row) => row.key === "impf-pl-2")?.cells[3].displayText).toBe("amārēminī");
     expect(finite?.rows.find((row) => row.key === "impf-pl-3")?.cells[2].displayText).toBe("amārent");
     expect(finite?.rows.find((row) => row.key === "fut-sg-1")?.cells[0].segments.find((segment) => segment.role === "tenseMood")?.text).toBe("b");
@@ -351,6 +353,7 @@ describe("verb generation", () => {
     expect(finite?.rows.find((row) => row.key === "fut-pl-3")?.cells[0].segments.find((segment) => segment.role === "tenseMood")?.text).toBe("bu");
     expect(finite?.rows.find((row) => row.key === "pf-sg-2")?.cells[0].segments.find((segment) => segment.role === "personal")?.text).toBe("istī");
     expect(finite?.rows.find((row) => row.key === "pf-sg-1")?.cells[2].segments.find((segment) => segment.role === "tenseMood")?.text).toBe("eri");
+    expect(finite?.rows.find((row) => row.key === "pf-sg-2")?.cells[2].segments.find((segment) => segment.role === "tenseMood")?.text).toBe("erī");
     expect(finite?.rows.find((row) => row.key === "plupf-sg-1")?.cells[0].segments.find((segment) => segment.role === "tenseMood")?.text).toBe("era");
     expect(finite?.rows.find((row) => row.key === "plupf-sg-1")?.cells[0].segments.find((segment) => segment.role === "personal")?.text).toBe("m");
     expect(finite?.rows.find((row) => row.key === "plupf-sg-1")?.cells[2].displayText).toBe("amāvissem");
@@ -429,13 +432,64 @@ describe("verb generation", () => {
     expect(amoFinite?.rows.find((row) => row.key === "pres-sg-1")?.cells[1].displayText).toBe("amor");
     expect(amoFinite?.rows.find((row) => row.key === "pres-sg-1")?.cells[1].segments.find((segment) => segment.role === "personal")?.text).toBe("r");
     expect(amoFinite?.rows.find((row) => row.key === "pres-sg-3")?.cells[1].displayText).toBe("amātur");
+    expect(amoFinite?.rows.find((row) => row.key === "pres-sg-3")?.cells[3].displayText).toBe("amētur");
     expect(amoSections.find((section) => section.title.includes("infinitives"))?.rows.find((row) => row.key === "present passive")?.cells[0].displayText).toBe("amārī");
 
     const agoSections = generateEntrySections(ago, visibility);
     const agoFinite = agoSections.find((section) => section.signature.startsWith("verb:finite"));
     expect(agoFinite?.rows.find((row) => row.key === "pres-sg-1")?.cells[1].displayText).toBe("agor");
     expect(agoFinite?.rows.find((row) => row.key === "pres-sg-3")?.cells[1].displayText).toBe("agitur");
+    expect(agoFinite?.rows.find((row) => row.key === "fut-sg-3")?.cells[0].displayText).toBe("aget");
+    expect(agoFinite?.rows.find((row) => row.key === "fut-sg-3")?.cells[1].displayText).toBe("agetur");
     expect(agoSections.find((section) => section.title.includes("infinitives"))?.rows.find((row) => row.key === "present passive")?.cells[0].displayText).toBe("agī");
+  });
+
+  it("uses the correct 3sg vowel lengths in second-conjugation present and imperfect forms", () => {
+    const principalParts = { first: "moneō", infinitive: "monēre", perfect: "monuī", supine: "monitum" };
+    const entry: VerbEntry = {
+      id: "moneo",
+      pos: "verb",
+      lemma: "moneō",
+      displayName: "moneō",
+      conjugation: "2",
+      principalParts,
+      ...deriveVerbStems("2", principalParts)
+    };
+
+    const finite = generateEntrySections(entry, visibility).find((section) => section.signature.startsWith("verb:finite"));
+    expect(finite?.rows.find((row) => row.key === "pres-sg-3")?.cells[0].displayText).toBe("monet");
+    expect(finite?.rows.find((row) => row.key === "pres-sg-3")?.cells[1].displayText).toBe("monētur");
+    expect(finite?.rows.find((row) => row.key === "pres-sg-3")?.cells[3].displayText).toBe("moneātur");
+    expect(finite?.rows.find((row) => row.key === "impf-sg-3")?.cells[2].displayText).toBe("monēret");
+    expect(finite?.rows.find((row) => row.key === "impf-sg-3")?.cells[3].displayText).toBe("monērētur");
+  });
+
+  it("only highlights stems in infinitives", () => {
+    const principalParts = { first: "amō", infinitive: "amāre", perfect: "amāvī", supine: "amātum" };
+    const entry: VerbEntry = {
+      id: "amo",
+      pos: "verb",
+      lemma: "amō",
+      displayName: "amō",
+      conjugation: "1",
+      principalParts,
+      ...deriveVerbStems("1", principalParts)
+    };
+
+    const infinitives = generateEntrySections(entry, visibility).find((section) => section.title.includes("infinitives"));
+    const presentActive = infinitives?.rows.find((row) => row.key === "present active")?.cells[0];
+    const perfectActive = infinitives?.rows.find((row) => row.key === "perfect active")?.cells[0];
+    const futureActive = infinitives?.rows.find((row) => row.key === "future active")?.cells[0];
+
+    expect(presentActive?.segments.map((segment) => segment.role)).toEqual(["stem", "form"]);
+    expect(presentActive?.segments[0]?.text).toBe("am");
+    expect(presentActive?.segments[1]?.text).toBe("āre");
+    expect(perfectActive?.segments.map((segment) => segment.role)).toEqual(["stem", "form"]);
+    expect(perfectActive?.segments[0]?.text).toBe("amāv");
+    expect(perfectActive?.segments[1]?.text).toBe("isse");
+    expect(futureActive?.segments.map((segment) => segment.role)).toEqual(["stem", "form"]);
+    expect(futureActive?.segments[0]?.text).toBe("amāt");
+    expect(futureActive?.segments[1]?.text).toBe("ūrus esse");
   });
 
   it("does not mark passive compound auxiliaries as tense markers", () => {
