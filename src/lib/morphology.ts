@@ -1147,7 +1147,7 @@ function presentSubjunctiveSegments(entry: VerbEntry, voice: VerbVoice, person: 
 
 function imperfectIndicativeSegments(entry: VerbEntry, voice: VerbVoice, person: Person, number: LatinNumber): TextSegment[] {
   const stemVowel = entry.conjugation === "1" ? "ā" : entry.conjugation === "3io" || entry.conjugation === "4" ? "iē" : "ē";
-  const marker = finiteMarkerIsLong(person, number) ? "bā" : "ba";
+  const marker = finiteMarkerIsLong(person, number) || (voice === "passive" && passiveThirdSingularLong(person, number)) ? "bā" : "ba";
   const personal = voice === "active" ? activePersonal(person, number) : passivePersonal(person, number);
   return verbSegments(`${entry.presentStem}${stemVowel}`, marker, "", personal, { tenseMood: "secondary" });
 }
@@ -1167,7 +1167,16 @@ function futureFirstSecondSegments(entry: VerbEntry, voice: VerbVoice, person: P
 
 function futureOtherSegments(entry: VerbEntry, voice: VerbVoice, person: Person, number: LatinNumber): TextSegment[] {
   const stemVowel = entry.conjugation === "3io" || entry.conjugation === "4" ? "i" : "";
-  const marker = person === "1" && number === "sg" ? "a" : person === "3" ? "e" : "ē";
+  const marker =
+    person === "1" && number === "sg"
+      ? "a"
+      : person === "3" && number === "sg"
+        ? voice === "passive"
+          ? "ē"
+          : "e"
+        : person === "3"
+          ? "e"
+          : "ē";
   const personal = voice === "active" ? activePersonal(person, number) : passivePersonal(person, number);
   return verbSegments(entry.presentStem, marker, stemVowel, personal, { tenseMood: "secondary" });
 }
@@ -1192,7 +1201,7 @@ function pluperfectSubjunctiveActiveSegments(entry: VerbEntry, person: Person, n
 
 function presentVowel(entry: VerbEntry, person: Person, number: LatinNumber): string {
   const c = entry.conjugation;
-  if (c === "1") return person === "1" && number === "sg" ? "" : person === "3" && number === "pl" ? "a" : "ā";
+  if (c === "1") return person === "1" && number === "sg" ? "" : person === "3" ? "a" : "ā";
   if (c === "2") return (person === "1" && number === "sg") || person === "3" ? "e" : "ē";
   if (c === "3") return person === "1" && number === "sg" ? "" : person === "3" && number === "pl" ? "u" : "i";
   if (c === "3io") return person === "3" && number === "pl" ? "iu" : person === "1" && number === "sg" ? "i" : "i";

@@ -429,6 +429,7 @@ describe("verb generation", () => {
 
     const amoSections = generateEntrySections(amo, visibility);
     const amoFinite = amoSections.find((section) => section.signature.startsWith("verb:finite"));
+    expect(amoFinite?.rows.find((row) => row.key === "pres-sg-3")?.cells[0].displayText).toBe("amat");
     expect(amoFinite?.rows.find((row) => row.key === "pres-sg-1")?.cells[1].displayText).toBe("amor");
     expect(amoFinite?.rows.find((row) => row.key === "pres-sg-1")?.cells[1].segments.find((segment) => segment.role === "personal")?.text).toBe("r");
     expect(amoFinite?.rows.find((row) => row.key === "pres-sg-3")?.cells[1].displayText).toBe("amātur");
@@ -440,7 +441,8 @@ describe("verb generation", () => {
     expect(agoFinite?.rows.find((row) => row.key === "pres-sg-1")?.cells[1].displayText).toBe("agor");
     expect(agoFinite?.rows.find((row) => row.key === "pres-sg-3")?.cells[1].displayText).toBe("agitur");
     expect(agoFinite?.rows.find((row) => row.key === "fut-sg-3")?.cells[0].displayText).toBe("aget");
-    expect(agoFinite?.rows.find((row) => row.key === "fut-sg-3")?.cells[1].displayText).toBe("agetur");
+    expect(agoFinite?.rows.find((row) => row.key === "fut-sg-3")?.cells[1].displayText).toBe("agētur");
+    expect(agoFinite?.rows.find((row) => row.key === "impf-sg-3")?.cells[1].displayText).toBe("agēbātur");
     expect(agoSections.find((section) => section.title.includes("infinitives"))?.rows.find((row) => row.key === "present passive")?.cells[0].displayText).toBe("agī");
   });
 
