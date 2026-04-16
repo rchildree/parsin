@@ -79,15 +79,29 @@ const PRONOUN_OPTIONS: Exclude<PronounType, "">[] = [
   "quisque"
 ];
 
+type CopyTarget = "word" | "pages" | "google-docs" | "markdown" | "html";
+
 export default function App() {
   const [project, setProject] = useState<Project>(() => loadProject(DEFAULT_PROJECT));
   const [editorMode, setEditorMode] = useState<"add" | "edit" | null>(null);
   const [draftEntry, setDraftEntry] = useState<MorphEntry | null>(null);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(true);
+  const [copyDropdownOpen, setCopyDropdownOpen] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
+  const copyDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => saveProject(project), [project]);
+
+  useEffect(() => {
+    function handleOutsideClick(e: MouseEvent) {
+      if (copyDropdownRef.current && !copyDropdownRef.current.contains(e.target as Node)) {
+        setCopyDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
 
   const rendered = useMemo(() => buildTemplateCharts(project, project.template), [project]);
   const cssErrors = styleErrors(project.styleRules);
@@ -138,16 +152,24 @@ export default function App() {
     setEditingEntryId(null);
   }
 
-  async function copyCharts() {
+  async function copyCharts(target: CopyTarget) {
     const node = chartRef.current;
     if (!node) return;
+    setCopyDropdownOpen(false);
+
+    if (target === "markdown") {
+      const md = buildMarkdown(node);
+      await navigator.clipboard.writeText(md);
+      return;
+    }
+
+    const htmlStr = target === "html" ? node.innerHTML : buildInlinedHTML(node, target);
     const text = node.innerText;
-    const html = node.innerHTML;
 
     if ("ClipboardItem" in window) {
       await navigator.clipboard.write([
         new ClipboardItem({
-          "text/html": new Blob([html], { type: "text/html" }),
+          "text/html": new Blob([htmlStr], { type: "text/html" }),
           "text/plain": new Blob([text], { type: "text/plain" })
         })
       ]);
@@ -185,7 +207,23 @@ export default function App() {
           <p>Generate declension and conjugation charts from supplied stems, principal parts, templates, and style rules.</p>
         </div>
         <div className="toolbar-actions">
-          <button onClick={copyCharts}>Copy charts</button>
+          <div className="copy-dropdown" ref={copyDropdownRef}>
+            <button className="copy-dropdown-main" onClick={() => copyCharts("word")}>Copy charts to…</button>
+            <button
+              className="copy-dropdown-toggle"
+              onClick={() => setCopyDropdownOpen((o) => !o)}
+              aria-label="Choose copy target"
+            >▾</button>
+            {copyDropdownOpen && (
+              <ul className="copy-dropdown-menu">
+                <li><button onClick={() => copyCharts("word")}>Microsoft Word</button></li>
+                <li><button onClick={() => copyCharts("pages")}>Apple Pages</button></li>
+                <li><button onClick={() => copyCharts("google-docs")}>Google Docs</button></li>
+                <li><button onClick={() => copyCharts("markdown")}>Markdown</button></li>
+                <li><button onClick={() => copyCharts("html")}>Raw HTML</button></li>
+              </ul>
+            )}
+          </div>
           <button onClick={() => window.print()}>Print</button>
         </div>
       </section>
@@ -1276,4 +1314,139 @@ function buildStyleCss({ bold, italic, smallCaps, color, background }: ParsedSty
   if (color) parts.push(`color: ${color}`);
   if (background) parts.push(`background-color: ${background}`);
   return parts.join("; ");
+}
+
+// CSS properties to inline per element tag when copying to word processors / web editors.
+const INLINE_PROPS: Record<string, string[]> = {
+  TABLE: ["border-collapse", "font-family", "font-size"],
+  CAPTION: ["text-align", "font-weight", "padding-top", "padding-right", "padding-bottom", "padding-left", "color"],
+  TH: [
+    "border-top-width", "border-top-style", "border-top-color",
+    "border-right-width", "border-right-style", "border-right-color",
+    "border-bottom-width", "border-bottom-style", "border-bottom-color",
+    "border-left-width", "border-left-style", "border-left-color",
+    "padding-top", "padding-right", "padding-bottom", "padding-left",
+    "background-color", "white-space", "min-width", "vertical-align",
+    "text-align", "font-weight", "color"
+  ],
+  TD: [
+    "border-top-width", "border-top-style", "border-top-color",
+    "border-right-width", "border-right-style", "border-right-color",
+    "border-bottom-width", "border-bottom-style", "border-bottom-color",
+    "border-left-width", "border-left-style", "border-left-color",
+    "padding-top", "padding-right", "padding-bottom", "padding-left",
+    "background-color", "white-space", "min-width", "vertical-align",
+    "text-align", "font-weight", "color"
+  ],
+  SPAN: [
+    "color", "background-color", "font-weight", "font-style",
+    "font-variant", "text-decoration-line", "padding-top", "padding-bottom", "border-radius"
+  ]
+};
+
+function rgbToHex(rgb: string): string {
+  const m = rgb.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!m) return rgb;
+  return "#" + [m[1], m[2], m[3]].map((n) => parseInt(n).toString(16).padStart(2, "0")).join("");
+}
+
+function buildInlinedHTML(root: HTMLElement, target: "word" | "pages" | "google-docs"): string {
+  const clone = root.cloneNode(true) as HTMLElement;
+
+  function walk(orig: Element, cloned: Element) {
+    const tag = orig.tagName;
+    const props = INLINE_PROPS[tag];
+    if (props) {
+      const computed = window.getComputedStyle(orig);
+      for (const prop of props) {
+        const value = computed.getPropertyValue(prop);
+        if (value && value !== "rgba(0, 0, 0, 0)") {
+          (cloned as HTMLElement).style.setProperty(prop, value);
+        }
+      }
+      if (target === "google-docs" && (tag === "TD" || tag === "TH")) {
+        const bg = computed.getPropertyValue("background-color");
+        if (bg && bg !== "rgba(0, 0, 0, 0)") {
+          (cloned as HTMLElement).setAttribute("bgcolor", rgbToHex(bg));
+        }
+      }
+    }
+    (cloned as HTMLElement).removeAttribute("class");
+
+    const origChildren = orig.children;
+    const cloneChildren = cloned.children;
+    for (let i = 0; i < origChildren.length; i++) {
+      walk(origChildren[i], cloneChildren[i]);
+    }
+  }
+
+  walk(root, clone);
+  return clone.outerHTML;
+}
+
+function buildMarkdown(root: HTMLElement): string {
+  const tables = Array.from(root.querySelectorAll("table"));
+  const sections: string[] = [];
+
+  for (const table of tables) {
+    const lines: string[] = [];
+
+    // Caption as heading
+    const caption = table.querySelector("caption");
+    if (caption?.textContent?.trim()) {
+      lines.push(`### ${caption.textContent.trim()}`);
+      lines.push("");
+    }
+
+    const headerRows = Array.from(table.querySelectorAll("thead tr"));
+
+    // Build column headers — if two header rows, merge group + leaf labels
+    let headers: string[] = [];
+    if (headerRows.length === 2) {
+      // Row 0: group labels (with colspan), Row 1: leaf labels
+      const groupRow = headerRows[0];
+      const leafRow = headerRows[1];
+      const groupCells = Array.from(groupRow.querySelectorAll("th"));
+      // Expand group cells to per-column labels
+      const expandedGroups: string[] = [];
+      for (const cell of groupCells) {
+        const span = parseInt(cell.getAttribute("colspan") || "1", 10);
+        const label = cell.textContent?.trim() || "";
+        for (let i = 0; i < span; i++) expandedGroups.push(label);
+      }
+      const leafCells = Array.from(leafRow.querySelectorAll("th"));
+      headers = leafCells.map((cell, i) => {
+        const group = expandedGroups[i] || "";
+        const leaf = cell.textContent?.trim() || "";
+        return group && leaf ? `${group} ${leaf}` : group || leaf;
+      });
+    } else if (headerRows.length === 1) {
+      headers = Array.from(headerRows[0].querySelectorAll("th")).map((c) => c.textContent?.trim() || "");
+    }
+
+    if (headers.length === 0) continue;
+
+    const escape = (s: string) => s.replace(/\|/g, "\\|").replace(/\n/g, " ");
+    lines.push("| " + headers.map(escape).join(" | ") + " |");
+    lines.push("| " + headers.map(() => "---").join(" | ") + " |");
+
+    // Body rows
+    const bodyRows = Array.from(table.querySelectorAll("tbody tr"));
+    for (const row of bodyRows) {
+      const cells = Array.from(row.querySelectorAll("th, td"));
+      if (cells.length === 0) continue;
+      // Expand cells with colspan
+      const expanded: string[] = [];
+      for (const cell of cells) {
+        const span = parseInt(cell.getAttribute("colspan") || "1", 10);
+        const text = escape(cell.textContent?.trim() || "");
+        for (let i = 0; i < span; i++) expanded.push(text);
+      }
+      lines.push("| " + expanded.join(" | ") + " |");
+    }
+
+    sections.push(lines.join("\n"));
+  }
+
+  return sections.join("\n\n---\n\n");
 }
